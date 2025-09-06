@@ -1,0 +1,58 @@
+const mongoose = require('mongoose');
+
+const trackingSchema = new mongoose.Schema({
+  driverName: {
+    type: String,
+    required: true
+  },
+  driverId: {
+    type: String,
+    required: true
+  },
+  busNumberPlate: {
+    type: String,
+    required: true
+  },
+  busName: {
+    type: String,
+    required: true
+  },
+  middlestations: [{
+    name: {
+      type: String,
+      required: true
+    },
+    lat: {
+      type: Number,
+      required: true
+    },
+    long: {
+      type: Number,
+      required: true
+    }
+  }],
+  startingPlace: {
+    type: String,
+    required: true
+  },
+  destination: {
+    type: String,
+    required: true
+  },
+  currLat: {
+    type: Number,
+    required: true
+  },
+  currLong: {
+    type: Number,
+    required: true
+  },
+  isactive: {
+    type: Boolean,
+    required: true
+  }
+});
+
+const Tracking = mongoose.model('Tracking', trackingSchema);
+
+module.exports = Tracking;
