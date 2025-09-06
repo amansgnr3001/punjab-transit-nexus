@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, User, LogIn, Bus, Route, Calendar } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, User, LogIn, Bus, Route, Calendar, Plus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
@@ -11,6 +13,19 @@ const MunicipalityPortal = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [activeSection, setActiveSection] = useState("dashboard");
+  const [showAddBusForm, setShowAddBusForm] = useState(false);
+  const [busForm, setBusForm] = useState({
+    Bus_number_plate: "",
+    busName: "",
+    schedules: [{
+      starttime: "",
+      endtime: "",
+      startingPlace: "",
+      destination: "",
+      stops: [{ name: "" }],
+      days: [""]
+    }]
+  });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +40,122 @@ const MunicipalityPortal = () => {
     setActiveSection("dashboard");
   };
 
+  const handleAddBus = () => {
+    setShowAddBusForm(true);
+  };
+
+  const handleBusFormChange = (field: string, value: any, scheduleIndex?: number, stopIndex?: number, dayIndex?: number) => {
+    if (field === 'Bus_number_plate' || field === 'busName') {
+      setBusForm(prev => ({ ...prev, [field]: value }));
+    } else if (scheduleIndex !== undefined) {
+      if (field === 'name' && stopIndex !== undefined) {
+        const newSchedules = [...busForm.schedules];
+        newSchedules[scheduleIndex].stops[stopIndex] = { ...newSchedules[scheduleIndex].stops[stopIndex], name: value };
+        setBusForm(prev => ({ ...prev, schedules: newSchedules }));
+      } else if (field === 'days' && dayIndex !== undefined) {
+        const newSchedules = [...busForm.schedules];
+        newSchedules[scheduleIndex].days[dayIndex] = value;
+        setBusForm(prev => ({ ...prev, schedules: newSchedules }));
+      } else {
+        const newSchedules = [...busForm.schedules];
+        newSchedules[scheduleIndex] = { ...newSchedules[scheduleIndex], [field]: value };
+        setBusForm(prev => ({ ...prev, schedules: newSchedules }));
+      }
+    }
+  };
+
+  const addStop = (scheduleIndex: number) => {
+    const newSchedules = [...busForm.schedules];
+    newSchedules[scheduleIndex].stops.push({ name: "" });
+    setBusForm(prev => ({ ...prev, schedules: newSchedules }));
+  };
+
+  const removeStop = (scheduleIndex: number, stopIndex: number) => {
+    const newSchedules = [...busForm.schedules];
+    newSchedules[scheduleIndex].stops.splice(stopIndex, 1);
+    setBusForm(prev => ({ ...prev, schedules: newSchedules }));
+  };
+
+  const addDay = (scheduleIndex: number) => {
+    const newSchedules = [...busForm.schedules];
+    newSchedules[scheduleIndex].days.push("");
+    setBusForm(prev => ({ ...prev, schedules: newSchedules }));
+  };
+
+  const removeDay = (scheduleIndex: number, dayIndex: number) => {
+    const newSchedules = [...busForm.schedules];
+    newSchedules[scheduleIndex].days.splice(dayIndex, 1);
+    setBusForm(prev => ({ ...prev, schedules: newSchedules }));
+  };
+
+  const addSchedule = () => {
+    setBusForm(prev => ({
+      ...prev,
+      schedules: [...prev.schedules, {
+        starttime: "",
+        endtime: "",
+        startingPlace: "",
+        destination: "",
+        stops: [{ name: "" }],
+        days: [""]
+      }]
+    }));
+  };
+
+  const removeSchedule = (scheduleIndex: number) => {
+    const newSchedules = busForm.schedules.filter((_, index) => index !== scheduleIndex);
+    setBusForm(prev => ({ ...prev, schedules: newSchedules }));
+  };
+
+  const handleSubmitBus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Prepare data for submission - set lat, long, time as 0 for each stop
+    const submitData = {
+      ...busForm,
+      schedules: busForm.schedules.map(schedule => ({
+        ...schedule,
+        stops: schedule.stops.map(stop => ({
+          ...stop,
+          lat: 0,
+          long: 0,
+          time: 0
+        }))
+      }))
+    };
+
+    try {
+      const response = await fetch('http://localhost:3000/api/municipality/buses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submitData),
+      });
+
+      if (response.ok) {
+        console.log('Bus added successfully');
+        setShowAddBusForm(false);
+        setBusForm({
+          Bus_number_plate: "",
+          busName: "",
+          schedules: [{
+            starttime: "",
+            endtime: "",
+            startingPlace: "",
+            destination: "",
+            stops: [{ name: "" }],
+            days: [""]
+          }]
+        });
+      } else {
+        console.error('Failed to add bus');
+      }
+    } catch (error) {
+      console.error('Error adding bus:', error);
+    }
+  };
+
   const sidebarItems = [
     { id: "bus", title: "Bus", icon: Bus },
     { id: "route", title: "Route", icon: Route },
@@ -36,8 +167,212 @@ const MunicipalityPortal = () => {
       case "bus":
         return (
           <div>
-            <h3 className="text-2xl font-bold mb-4">Bus Management</h3>
-            <p className="text-muted-foreground">Manage bus fleet and vehicle information.</p>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-2xl font-bold mb-2">Bus Management</h3>
+                <p className="text-muted-foreground">Manage bus fleet and vehicle information.</p>
+              </div>
+              <Button 
+                onClick={handleAddBus}
+                style={{ backgroundColor: 'hsl(var(--government-green))', color: 'white' }}
+                className="hover:opacity-90"
+              >
+                Add Bus
+              </Button>
+            </div>
+
+            {showAddBusForm && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Add New Bus</CardTitle>
+                  <CardDescription>Fill in the bus information and schedules</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmitBus} className="space-y-6">
+                    {/* Basic Bus Information */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="busNumberPlate">Bus Number Plate</Label>
+                        <Input
+                          id="busNumberPlate"
+                          value={busForm.Bus_number_plate}
+                          onChange={(e) => handleBusFormChange('Bus_number_plate', e.target.value)}
+                          placeholder="e.g., PB-01-A-1234"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="busName">Bus Name</Label>
+                        <Input
+                          id="busName"
+                          value={busForm.busName}
+                          onChange={(e) => handleBusFormChange('busName', e.target.value)}
+                          placeholder="e.g., Express Bus 1"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Schedules */}
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-lg font-semibold">Schedules</h4>
+                        <Button type="button" onClick={addSchedule} variant="outline" size="sm">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Schedule
+                        </Button>
+                      </div>
+
+                      {busForm.schedules.map((schedule, scheduleIndex) => (
+                        <Card key={scheduleIndex} className="p-4">
+                          <div className="flex justify-between items-center mb-4">
+                            <h5 className="font-medium">Schedule {scheduleIndex + 1}</h5>
+                            {busForm.schedules.length > 1 && (
+                              <Button
+                                type="button"
+                                onClick={() => removeSchedule(scheduleIndex)}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div className="space-y-2">
+                              <Label>Start Time</Label>
+                              <Input
+                                type="time"
+                                value={schedule.starttime}
+                                onChange={(e) => handleBusFormChange('starttime', e.target.value, scheduleIndex)}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>End Time</Label>
+                              <Input
+                                type="time"
+                                value={schedule.endtime}
+                                onChange={(e) => handleBusFormChange('endtime', e.target.value, scheduleIndex)}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Starting Place</Label>
+                              <Input
+                                value={schedule.startingPlace}
+                                onChange={(e) => handleBusFormChange('startingPlace', e.target.value, scheduleIndex)}
+                                placeholder="e.g., Amritsar"
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Destination</Label>
+                              <Input
+                                value={schedule.destination}
+                                onChange={(e) => handleBusFormChange('destination', e.target.value, scheduleIndex)}
+                                placeholder="e.g., Ludhiana"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          {/* Stops */}
+                          <div className="space-y-2 mb-4">
+                            <div className="flex justify-between items-center">
+                              <Label>Stops</Label>
+                              <Button
+                                type="button"
+                                onClick={() => addStop(scheduleIndex)}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Stop
+                              </Button>
+                            </div>
+                            {schedule.stops.map((stop, stopIndex) => (
+                              <div key={stopIndex} className="flex gap-2">
+                                <Input
+                                  value={stop.name}
+                                  onChange={(e) => handleBusFormChange('name', e.target.value, scheduleIndex, stopIndex)}
+                                  placeholder="Stop name"
+                                  required
+                                />
+                                {schedule.stops.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    onClick={() => removeStop(scheduleIndex, stopIndex)}
+                                    variant="outline"
+                                    size="sm"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Days */}
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <Label>Operating Days</Label>
+                              <Button
+                                type="button"
+                                onClick={() => addDay(scheduleIndex)}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Day
+                              </Button>
+                            </div>
+                            {schedule.days.map((day, dayIndex) => (
+                              <div key={dayIndex} className="flex gap-2">
+                                <Input
+                                  value={day}
+                                  onChange={(e) => handleBusFormChange('days', e.target.value, scheduleIndex, undefined, dayIndex)}
+                                  placeholder="e.g., Monday"
+                                  required
+                                />
+                                {schedule.days.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    onClick={() => removeDay(scheduleIndex, dayIndex)}
+                                    variant="outline"
+                                    size="sm"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Form Actions */}
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowAddBusForm(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        style={{ backgroundColor: 'hsl(var(--government-green))', color: 'white' }}
+                      >
+                        Submit
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
           </div>
         );
       case "route":

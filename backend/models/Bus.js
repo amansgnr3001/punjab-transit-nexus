@@ -38,6 +38,10 @@ const busSchema = new mongoose.Schema({
       long: {
         type: Number,
         required: true
+      },
+      time:{
+        type: Number,
+        required: true
       }
     }],
     days: [{
