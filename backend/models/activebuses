@@ -29,6 +29,10 @@ const trackingSchema = new mongoose.Schema({
     long: {
       type: Number,
       required: true
+    },
+    time: {
+      type: Number,
+      required: true
     }
   }],
   startingPlace: {
@@ -41,10 +45,14 @@ const trackingSchema = new mongoose.Schema({
   },
   currLat: {
     type: Number,
-    required: true
+    required: false
   },
   currLong: {
     type: Number,
+    required: false
+  },
+  address: {
+    type: String,
     required: true
   },
   isactive: {

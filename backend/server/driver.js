@@ -59,26 +59,7 @@ const io = new Server(server, {
 io.on('connection', (socket) => {
 	console.log(`Driver connected: ${socket.id}`);
 
-	// Handle driver location updates
-	socket.on('driver-location-update', (data) => {
-		console.log('Driver location update:', data);
-		// Broadcast location update to all connected clients
-		socket.broadcast.emit('driver-location-updated', data);
-	});
-
-	// Handle driver journey start
-	socket.on('driver-journey-start', (data) => {
-		console.log('Driver journey started:', data);
-		// Broadcast journey start to all connected clients
-		io.emit('driver-journey-started', data);
-	});
-
-	// Handle driver journey end
-	socket.on('driver-journey-end', (data) => {
-		console.log('Driver journey ended:', data);
-		// Broadcast journey end to all connected clients
-		io.emit('driver-journey-ended', data);
-	});
+	
 
 	// Handle disconnection
 	socket.on('disconnect', () => {
@@ -313,6 +294,9 @@ app.post('/api/driver/start-journey', wrap(async (req, res) => {
 		}
 
 		// Create new activebuses document
+		console.log('Creating new activebuses document...');
+		console.log('Database name:', mongoose.connection.db.databaseName);
+		
 		const newActiveBus = new Tracking({
 			driverName,
 			driverId,
@@ -326,12 +310,21 @@ app.post('/api/driver/start-journey', wrap(async (req, res) => {
 			})),
 			startingPlace,
 			destination,
+			address: startingPlace, // Set address equal to startingPlace
 			currLat: 0,
 			currLong: 0,
 			isactive: true
 		});
 
-		await newActiveBus.save();
+		console.log('Document to save:', JSON.stringify(newActiveBus, null, 2));
+		
+		try {
+			await newActiveBus.save();
+			console.log('Document saved successfully!');
+		} catch (saveError) {
+			console.error('Error saving document:', saveError);
+			throw saveError;
+		}
 
 		res.status(201).json({
 			success: true,
@@ -344,6 +337,7 @@ app.post('/api/driver/start-journey', wrap(async (req, res) => {
 				busName: newActiveBus.busName,
 				startingPlace: newActiveBus.startingPlace,
 				destination: newActiveBus.destination,
+				address: newActiveBus.address,
 				isactive: newActiveBus.isactive
 			}
 		});
