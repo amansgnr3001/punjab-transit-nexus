@@ -65,6 +65,182 @@ function wrap(handler) {
 
 // Basic API Routes
 
+// Search buses by day, starting place, and destination
+app.get('/api/passenger/search-buses', wrap(async (req, res) => {
+	try {
+		const { day, startingPlace, destination } = req.query;
+		
+		// Validate required parameters
+		if (!day || !startingPlace || !destination) {
+			return res.status(400).json({
+				success: false,
+				message: 'Missing required parameters: day, startingPlace, destination'
+			});
+		}
+		
+		console.log('Searching buses for:', { day, startingPlace, destination });
+		
+		// Find buses that have schedules running on the specified day
+		const buses = await Bus.find({
+			'schedules.days': { $in: [day] }
+		});
+		
+		console.log(`Found ${buses.length} buses running on ${day}`);
+		
+		// Filter buses that match the route criteria
+		const matchingBuses = [];
+		
+		for (const bus of buses) {
+			// Check each schedule of the bus
+			for (const schedule of bus.schedules) {
+				// Check if this schedule runs on the specified day
+				if (schedule.days && schedule.days.includes(day)) {
+					let isMatch = false;
+					
+					console.log(`\n--- Checking bus ${bus.Bus_number_plate} schedule ---`);
+					console.log(`Schedule: ${schedule.startingPlace} → ${schedule.destination}`);
+					console.log(`Searching: ${startingPlace} → ${destination}`);
+					console.log(`Stops:`, schedule.stops?.map(s => s.name) || 'No stops');
+					
+					// Check if schedule starts at startingPlace and ends at destination
+					if (schedule.startingPlace.toLowerCase().includes(startingPlace.toLowerCase()) &&
+						schedule.destination.toLowerCase().includes(destination.toLowerCase())) {
+						console.log('✅ Match: Direct route (startingPlace → destination)');
+						isMatch = true;
+					}
+					// Check if both places are stops in the correct order
+					else if (schedule.stops && schedule.stops.length > 0) {
+						const startingPlaceIndex = schedule.stops.findIndex(stop => 
+							stop.name.toLowerCase().includes(startingPlace.toLowerCase())
+						);
+						const destinationIndex = schedule.stops.findIndex(stop => 
+							stop.name.toLowerCase().includes(destination.toLowerCase())
+						);
+						
+						console.log(`Starting place "${startingPlace}" found at index: ${startingPlaceIndex}`);
+						console.log(`Destination "${destination}" found at index: ${destinationIndex}`);
+						
+						// Check if both places are found and startingPlace comes before destination
+						if (startingPlaceIndex !== -1 && destinationIndex !== -1 && startingPlaceIndex < destinationIndex) {
+							console.log('✅ Match: Both places found in stops in correct order');
+							isMatch = true;
+						}
+						// Also check if startingPlace is a stop and destination matches the schedule's destination
+						else if (startingPlaceIndex !== -1 && 
+								 schedule.destination.toLowerCase().includes(destination.toLowerCase())) {
+							console.log('✅ Match: Starting place is a stop and destination matches schedule destination');
+							isMatch = true;
+						}
+						// Also check if startingPlace matches schedule's startingPlace and destination is a stop
+						else if (schedule.startingPlace.toLowerCase().includes(startingPlace.toLowerCase()) &&
+								 destinationIndex !== -1) {
+							console.log('✅ Match: Starting place matches schedule and destination is a stop');
+							isMatch = true;
+						}
+						else {
+							console.log('❌ No match: Places not found or wrong order');
+						}
+					} else {
+						console.log('❌ No match: No stops available');
+					}
+					
+					if (isMatch) {
+						// Check if bus is active
+						const activeBus = await Tracking.findOne({ 
+							busNumberPlate: bus.Bus_number_plate,
+							isactive: true 
+						});
+						
+						// Add isactive status to bus data
+						const busWithStatus = {
+							...bus.toObject(),
+							schedule: schedule, // Include the matching schedule
+							isactive: !!activeBus
+						};
+						
+						matchingBuses.push(busWithStatus);
+						break; // Found a matching schedule, no need to check other schedules
+					}
+				}
+			}
+		}
+		
+		console.log(`Found ${matchingBuses.length} matching buses`);
+		
+		res.status(200).json({
+			success: true,
+			message: `Found ${matchingBuses.length} buses for the specified route`,
+			buses: matchingBuses
+		});
+		
+	} catch (error) {
+		console.error('Error searching buses:', error);
+		res.status(500).json({
+			success: false,
+			message: 'Error searching buses',
+			error: error.message
+		});
+	}
+}));
+
+// Get all unique places from buses
+app.get('/api/passenger/places', wrap(async (req, res) => {
+	try {
+		console.log('Fetching all unique places from buses...');
+		
+		// Get all buses
+		const buses = await Bus.find({});
+		console.log(`Found ${buses.length} buses in database`);
+		
+		const uniquePlaces = new Set();
+		
+		// Extract places from schedules
+		buses.forEach(bus => {
+			if (bus.schedules && bus.schedules.length > 0) {
+				bus.schedules.forEach(schedule => {
+					// Extract starting places
+					if (schedule.startingPlace) {
+						uniquePlaces.add(schedule.startingPlace);
+					}
+					
+					// Extract destinations
+					if (schedule.destination) {
+						uniquePlaces.add(schedule.destination);
+					}
+					
+					// Extract stop names
+					if (schedule.stops && schedule.stops.length > 0) {
+						schedule.stops.forEach(stop => {
+							if (stop.name) {
+								uniquePlaces.add(stop.name);
+							}
+						});
+					}
+				});
+			}
+		});
+		
+		// Convert Set to Array and sort
+		const placesList = Array.from(uniquePlaces).sort();
+		
+		console.log(`Found ${placesList.length} unique places:`, placesList);
+		
+		res.status(200).json({
+			success: true,
+			message: `Found ${placesList.length} unique places`,
+			places: placesList
+		});
+		
+	} catch (error) {
+		console.error('Error fetching places:', error);
+		res.status(500).json({
+			success: false,
+			message: 'Error fetching places',
+			error: error.message
+		});
+	}
+}));
+
 // Start server
 app.listen(PORT, () => {
 	console.log(`Passenger server running on port ${PORT}`);

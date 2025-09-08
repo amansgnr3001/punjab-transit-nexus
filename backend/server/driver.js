@@ -7,6 +7,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const http = require('http');
 const { Server } = require('socket.io');
+const fetch = require('node-fetch');
 require('dotenv').config();
 
 const app = express();
@@ -59,11 +60,169 @@ const io = new Server(server, {
 io.on('connection', (socket) => {
 	console.log(`Driver connected: ${socket.id}`);
 
-	
+	// Broadcast event for drivers
+	socket.on('broadcast', async (data) => {
+		try {
+			const { lat, long, busnumberplate } = data;
+			
+			console.log('=== BROADCAST EVENT RECEIVED ===');
+			console.log('Location data:', { lat, long, busnumberplate });
+			
+			// Validate required data
+			if (!lat || !long || !busnumberplate) {
+				console.log('❌ Missing required fields');
+				socket.emit('error', { message: 'Missing required fields: lat, long, busnumberplate' });
+				return;
+			}
+
+			// Retrieve document from activebuses schema
+			const activeBusDoc = await Tracking.findOne({ busNumberPlate: busnumberplate });
+			if (!activeBusDoc) {
+				console.log('❌ Active bus not found:', busnumberplate);
+				socket.emit('error', { message: 'Active bus not found with the provided bus number plate' });
+				return;
+			}
+			console.log('✅ Active bus found:', activeBusDoc.busName);
+
+			// Reverse geocoding to get current address
+			const geocodingUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${long}&key=AIzaSyAzttkphjYlfyEbUoe-5NtAVexKsOI7924`;
+			console.log('🌍 Geocoding URL:', geocodingUrl);
+			
+			const geocodingResponse = await fetch(geocodingUrl);
+			const geocodingData = await geocodingResponse.json();
+			
+			console.log('🌍 Geocoding Response Status:', geocodingResponse.status);
+			console.log('🌍 Geocoding Data:', JSON.stringify(geocodingData, null, 2));
+			
+			let curr_address = '';
+			if (geocodingData.status === 'OK' && geocodingData.results && geocodingData.results.length > 0) {
+				curr_address = geocodingData.results[0].formatted_address;
+				console.log('✅ Geocoding successful:', curr_address);
+			} else {
+				console.log('❌ Geocoding failed:', geocodingData.status, geocodingData.error_message);
+				socket.emit('error', { message: 'Failed to get current address from coordinates' });
+				return;
+			}
+
+			// Prepare waypoints from middle stations
+			const waypoints = activeBusDoc.middlestations.map(station => station.name).join('|');
+			console.log('🗺️ Waypoints:', waypoints);
+			
+			// Get directions from current location to destination via waypoints
+			const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(curr_address)}&destination=${encodeURIComponent(activeBusDoc.destination)}&waypoints=${encodeURIComponent(waypoints)}&key=AIzaSyAzttkphjYlfyEbUoe-5NtAVexKsOI7924`;
+			console.log('🗺️ Directions URL:', directionsUrl);
+			
+			const directionsResponse = await fetch(directionsUrl);
+			const directionsData = await directionsResponse.json();
+
+			console.log('🗺️ Directions Response Status:', directionsResponse.status);
+			console.log('🗺️ Directions Data:', JSON.stringify(directionsData, null, 2));
+
+			if (directionsData.status !== 'OK' || !directionsData.routes || directionsData.routes.length === 0) {
+				console.log('❌ Directions failed:', directionsData.status, directionsData.error_message);
+				socket.emit('error', { message: 'Failed to get directions' });
+				return;
+			}
+			console.log('✅ Directions successful');
+
+			// Get current time
+			const curr_time = new Date();
+
+			// Process legs and update timing data
+			const legs = directionsData.routes[0].legs;
+			
+			// Update middle stations timing
+			for (let i = 0; i < legs.length - 1; i++) {
+				if (activeBusDoc.middlestations[i]) {
+					activeBusDoc.middlestations[i].time = legs[i].duration.value;
+				}
+			}
+
+			// Update endtime with last leg duration
+			if (legs.length > 0) {
+				activeBusDoc.endtime = legs[legs.length - 1].duration.value;
+			}
+
+		// Update current address
+		console.log('🔄 Before update - currLat:', activeBusDoc.currLat, 'currLong:', activeBusDoc.currLong);
+		activeBusDoc.address = curr_address;
+		activeBusDoc.currLat = lat;
+		activeBusDoc.currLong = long;
+		console.log('🔄 After update - currLat:', activeBusDoc.currLat, 'currLong:', activeBusDoc.currLong);
+
+			console.log('📍 Updating location:', {
+				address: curr_address,
+				currLat: lat,
+				currLong: long
+			});
+
+			// Extract polyline
+			const polyline = directionsData.routes[0].overview_polyline.points;
+
+			// Save updated document
+		console.log('💾 Saving document to database...');
+		await activeBusDoc.save();
+		console.log('✅ Document saved successfully');
+		
+		// Verify the saved document
+		const savedDoc = await Tracking.findOne({ busNumberPlate: busnumberplate });
+		console.log('🔍 Verification - Saved document currLat:', savedDoc.currLat);
+		console.log('🔍 Verification - Saved document currLong:', savedDoc.currLong);
+		console.log('🔍 Verification - Saved document address:', savedDoc.address);
+
+			// Send response with updated document and polyline to all clients in the bus room
+			console.log('📡 Broadcasting to room:', busnumberplate);
+			console.log('📡 Room members count:', io.sockets.adapter.rooms.get(busnumberplate)?.size || 0);
+			io.to(busnumberplate).emit('broadcast_response', {
+				success: true,
+				activeBus: activeBusDoc,
+				polyline: polyline
+			});
+			console.log('✅ Broadcast sent successfully to room:', busnumberplate);
+
+		} catch (error) {
+			console.error('Broadcast error:', error);
+			socket.emit('error', { message: 'Internal server error during broadcast' });
+		}
+	});
+
+	// Businfo event for passengers
+	socket.on('businfo', (data) => {
+		try {
+			const { busnumberplate } = data;
+			
+			console.log('=== BUSINFO EVENT RECEIVED ===');
+			console.log('Bus number plate:', busnumberplate);
+			
+			// Validate required data
+			if (!busnumberplate) {
+				console.log('❌ Missing busnumberplate');
+				socket.emit('error', { message: 'Missing required field: busnumberplate' });
+				return;
+			}
+
+			// Add socket to the bus room
+			socket.join(busnumberplate);
+			console.log(`✅ Socket joined room: ${busnumberplate}`);
+			
+		
+			
+		} catch (error) {
+			console.error('Error in businfo event:', error);
+			socket.emit('error', { message: 'Error joining bus room' });
+		}
+	});
 
 	// Handle disconnection
 	socket.on('disconnect', () => {
 		console.log(`Driver disconnected: ${socket.id}`);
+		
+		// Clean up location interval if it exists
+		if (socket.locationInterval) {
+			clearInterval(socket.locationInterval);
+			socket.locationInterval = null;
+			console.log(`Location interval cleared for disconnected driver ${socket.id}`);
+		}
 	});
 });
 
@@ -293,6 +452,10 @@ app.post('/api/driver/start-journey', wrap(async (req, res) => {
 			});
 		}
 
+		// Debug: Log the matching schedule to see if endtime exists
+		console.log('Matching schedule found:', JSON.stringify(matchingSchedule, null, 2));
+		console.log('Endtime from schedule:', matchingSchedule.endtime);
+
 		// Create new activebuses document
 		console.log('Creating new activebuses document...');
 		console.log('Database name:', mongoose.connection.db.databaseName);
@@ -316,11 +479,19 @@ app.post('/api/driver/start-journey', wrap(async (req, res) => {
 			isactive: true
 		});
 
+		// Explicitly set endtime after document creation
+		newActiveBus.endtime = matchingSchedule.endtime;
+
 		console.log('Document to save:', JSON.stringify(newActiveBus, null, 2));
+		console.log('Endtime in newActiveBus:', newActiveBus.endtime);
+		console.log('Endtime type:', typeof newActiveBus.endtime);
+		console.log('Endtime value:', newActiveBus.endtime);
 		
 		try {
 			await newActiveBus.save();
 			console.log('Document saved successfully!');
+			console.log('Saved document endtime:', newActiveBus.endtime);
+			console.log('Full saved document:', JSON.stringify(newActiveBus, null, 2));
 		} catch (saveError) {
 			console.error('Error saving document:', saveError);
 			throw saveError;
@@ -338,6 +509,7 @@ app.post('/api/driver/start-journey', wrap(async (req, res) => {
 				startingPlace: newActiveBus.startingPlace,
 				destination: newActiveBus.destination,
 				address: newActiveBus.address,
+				endtime: newActiveBus.endtime,
 				isactive: newActiveBus.isactive
 			}
 		});
@@ -347,6 +519,54 @@ app.post('/api/driver/start-journey', wrap(async (req, res) => {
 		res.status(500).json({ 
 			success: false, 
 			message: 'Internal server error while starting journey' 
+		});
+	}
+}));
+
+// Deactivate Bus Route
+app.post('/api/driver/deactivate-bus/:busNumberPlate', wrap(async (req, res) => {
+	try {
+		const { busNumberPlate } = req.params;
+		
+		// Validate required parameter
+		if (!busNumberPlate) {
+			return res.status(400).json({ 
+				success: false, 
+				message: 'Missing required parameter: busNumberPlate' 
+			});
+		}
+
+		// Find the bus document in activebuses schema
+		const activeBusDoc = await Tracking.findOne({ busNumberPlate: busNumberPlate });
+		if (!activeBusDoc) {
+			return res.status(404).json({ 
+				success: false, 
+				message: 'Bus not found in active buses with the provided bus number plate' 
+			});
+		}
+
+		// Update isactive field from true to false
+		activeBusDoc.isactive = false;
+		await activeBusDoc.save();
+
+		console.log(`Bus ${busNumberPlate} deactivated successfully`);
+
+		res.status(200).json({
+			success: true,
+			message: 'Bus deactivated successfully',
+			bus: {
+				busNumberPlate: activeBusDoc.busNumberPlate,
+				busName: activeBusDoc.busName,
+				driverName: activeBusDoc.driverName,
+				isactive: activeBusDoc.isactive
+			}
+		});
+
+	} catch (error) {
+		console.error('Error deactivating bus:', error);
+		res.status(500).json({ 
+			success: false, 
+			message: 'Internal server error while deactivating bus' 
 		});
 	}
 }));

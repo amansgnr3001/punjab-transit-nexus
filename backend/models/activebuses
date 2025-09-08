@@ -51,7 +51,11 @@ const trackingSchema = new mongoose.Schema({
     type: Number,
     required: false
   },
-  address: {
+  address:{
+    type: String,
+    required:true
+  },
+  endtime: {
     type: String,
     required: true
   },
@@ -59,6 +63,27 @@ const trackingSchema = new mongoose.Schema({
     type: Boolean,
     required: true
   }
+});
+
+// Post middleware to auto-delete inactive buses after 30 minutes
+trackingSchema.post('save', async function(doc) {
+	if (doc.isactive === false) {
+		console.log(`Bus ${doc.busNumberPlate} marked as inactive. Will be deleted in 30 minutes.`);
+		
+		// Set a timeout to delete the document after 30 minutes
+		setTimeout(async () => {
+			try {
+				// Check if the document still exists and is still inactive
+				const existingDoc = await this.constructor.findOne({ _id: doc._id });
+				if (existingDoc && existingDoc.isactive === false) {
+					await this.constructor.findByIdAndDelete(doc._id);
+					console.log(`Bus ${doc.busNumberPlate} automatically deleted after 30 minutes of inactivity.`);
+				}
+			} catch (error) {
+				console.error('Error auto-deleting inactive bus:', error);
+			}
+		}, 30 * 60 * 1000); // 30 minutes
+	}
 });
 
 const Tracking = mongoose.model('Tracking', trackingSchema);

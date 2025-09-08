@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import CustomerPortal from "./pages/CustomerPortal";
+import BusSearchResults from "./pages/BusSearchResults";
 import DriverPortal from "./pages/DriverPortal";
 import MunicipalityPortal from "./pages/MunicipalityPortal";
 
@@ -20,6 +21,8 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/customer" element={<CustomerPortal />} />
+          <Route path="/customer-portal" element={<CustomerPortal />} />
+          <Route path="/bus-search-results" element={<BusSearchResults />} />
           <Route path="/driver" element={<DriverPortal />} />
           <Route path="/municipality" element={<MunicipalityPortal />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

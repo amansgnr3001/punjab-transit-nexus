@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, User, PlayCircle, LogIn, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBusRoutes } from "@/hooks/useBusRoutes";
+import { io } from "socket.io-client";
 
 const DriverPortal = () => {
   const navigate = useNavigate();
@@ -30,9 +31,15 @@ const DriverPortal = () => {
     startingPlace: "",
     destination: ""
   });
+  const [isJourneyActive, setIsJourneyActive] = useState(false);
+  const [activeJourney, setActiveJourney] = useState(null);
+  const [locationIntervalId, setLocationIntervalId] = useState(null);
+  const [socket, setSocket] = useState(null);
+  const [journeyStatus, setJourneyStatus] = useState('0'); // 0 = no journey, 1 = journey active
 
   // Custom hook for bus routes
   const { startingPlaces, destinations, loading: routesLoading, error: routesError, fetchRoutes, clearRoutes } = useBusRoutes();
+
 
   // Check if user is already logged in on component mount
   useEffect(() => {
@@ -41,7 +48,89 @@ const DriverPortal = () => {
       // Verify token and get driver data
       fetchDriverProfile(token);
     }
+    
+    // Check journey status from localStorage
+    const savedJourneyStatus = localStorage.getItem('driverJourneyStatus');
+    if (savedJourneyStatus) {
+      setJourneyStatus(savedJourneyStatus);
+      if (savedJourneyStatus === '1') {
+        // If journey was active, restore the journey state and restart location tracking
+        const savedBusNumberPlate = localStorage.getItem('driverBusNumberPlate');
+        if (savedBusNumberPlate) {
+          console.log('🔄 Restoring active journey after page refresh');
+          
+          // Set journey as active
+          setIsJourneyActive(true);
+          
+          // Reconnect socket
+          const newSocket = io('http://localhost:3001');
+          setSocket(newSocket);
+          
+          // Add socket connection debugging
+          newSocket.on('connect', () => {
+            console.log('🔌 Socket reconnected with ID:', newSocket.id);
+          });
+          
+          newSocket.on('disconnect', () => {
+            console.log('🔌 Socket disconnected');
+          });
+          
+          newSocket.on('connect_error', (error) => {
+            console.error('❌ Socket connection error:', error);
+          });
+          
+          // Restart location tracking every 30 seconds
+          const intervalId = setInterval(() => {
+            console.log('🔄 Location tracking interval triggered (restored)');
+            // Get current location and send directly to broadcast event
+            if (navigator.geolocation) {
+              console.log('📍 Requesting geolocation...');
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  const locationData = {
+                    lat: position.coords.latitude,
+                    long: position.coords.longitude,
+                    busnumberplate: savedBusNumberPlate
+                  };
+                  
+                  console.log('📍 Location received (restored):', locationData);
+                  console.log('🔌 Socket connected:', newSocket.connected);
+                  
+                  // Send location data to backend via broadcast event
+                  newSocket.emit('broadcast', locationData);
+                  console.log('📡 Location sent via broadcast event (restored):', locationData);
+                  console.log('📡 Socket connected status (restored):', newSocket.connected);
+                  console.log('📡 Socket ID (restored):', newSocket.id);
+                },
+                (error) => {
+                  console.error('❌ Error getting location:', error);
+                }
+              );
+            } else {
+              console.error('❌ Geolocation is not supported by this browser.');
+            }
+          }, 30000);
+          
+          setLocationIntervalId(intervalId);
+          console.log('✅ Location tracking restored successfully');
+        }
+      }
+    }
   }, []);
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      // Clear interval if component unmounts
+      if (locationIntervalId) {
+        clearInterval(locationIntervalId);
+      }
+      // Disconnect socket if component unmounts
+      if (socket) {
+        socket.disconnect();
+      }
+    };
+  }, [locationIntervalId, socket]);
 
   const fetchDriverProfile = async (token: string) => {
     try {
@@ -214,6 +303,65 @@ const DriverPortal = () => {
         
         // Save bus number plate to localStorage
         localStorage.setItem('driverBusNumberPlate', journeyForm.busNo);
+        
+        // Set journey as active
+        setIsJourneyActive(true);
+        setActiveJourney(data.activeBus);
+        
+        // Set journey status to active in localStorage
+        localStorage.setItem('driverJourneyStatus', '1');
+        setJourneyStatus('1');
+        
+        // Initialize socket connection
+        const newSocket = io('http://localhost:3001');
+        setSocket(newSocket);
+        
+        // Add socket connection debugging
+        newSocket.on('connect', () => {
+          console.log('🔌 Socket connected with ID:', newSocket.id);
+        });
+        
+        newSocket.on('disconnect', () => {
+          console.log('🔌 Socket disconnected');
+        });
+        
+        newSocket.on('connect_error', (error) => {
+          console.error('❌ Socket connection error:', error);
+        });
+        
+        // Start location tracking every 30 seconds
+        const intervalId = setInterval(() => {
+          console.log('🔄 Location tracking interval triggered');
+          // Get current location and send directly to broadcast event
+          if (navigator.geolocation) {
+            console.log('📍 Requesting geolocation...');
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const locationData = {
+                  lat: position.coords.latitude,
+                  long: position.coords.longitude,
+                  busnumberplate: journeyForm.busNo
+                };
+                
+                console.log('📍 Location received:', locationData);
+                console.log('🔌 Socket connected:', newSocket.connected);
+                
+                // Send location data to backend via broadcast event
+                newSocket.emit('broadcast', locationData);
+                console.log('📡 Location sent via broadcast event:', locationData);
+                console.log('📡 Socket connected status:', newSocket.connected);
+                console.log('📡 Socket ID:', newSocket.id);
+              },
+              (error) => {
+                console.error('❌ Error getting location:', error);
+              }
+            );
+          } else {
+            console.error('❌ Geolocation is not supported by this browser.');
+          }
+        }, 30000);
+        
+        setLocationIntervalId(intervalId);
         
         setShowStartJourneyForm(false);
         // You can add success notification here
@@ -464,32 +612,108 @@ const DriverPortal = () => {
                 </CardContent>
               </Card>
 
-              {/* Start Journey Card */}
-              <Card className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/20">
-                <CardHeader className="text-center pb-4">
-                  <div className="mx-auto mb-4 p-3 bg-primary/10 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                    <PlayCircle className="w-8 h-8 text-primary" />
-                  </div>
-                  <CardTitle className="text-xl">Start Journey</CardTitle>
-                  <CardDescription>
-                    Begin your assigned route and track your journey
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-center space-y-2">
-                    <p><strong>Next Route:</strong> Amritsar - Ludhiana</p>
-                    <p><strong>Bus No:</strong> PB-02-A-1234</p>
-                    <p><strong>Departure:</strong> 09:00 AM</p>
-                    <p><strong>Status:</strong> <span className="text-primary font-medium">Ready</span></p>
-                  </div>
-                  <Button 
-                    className="w-full bg-gradient-to-r from-primary to-primary-glow hover:from-primary-glow hover:to-primary"
-                    onClick={handleStartJourneyClick}
-                  >
-                    Start Journey
-                  </Button>
-                </CardContent>
-              </Card>
+              {/* Journey Card */}
+              {journeyStatus !== '1' ? (
+                /* Start Journey Card */
+                <Card className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/20">
+                  <CardHeader className="text-center pb-4">
+                    <div className="mx-auto mb-4 p-3 bg-primary/10 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                      <PlayCircle className="w-8 h-8 text-primary" />
+                    </div>
+                    <CardTitle className="text-xl">Start Journey</CardTitle>
+                    <CardDescription>
+                      Begin your assigned route and track your journey
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-center space-y-2">
+                      <p><strong>Next Route:</strong> Amritsar - Ludhiana</p>
+                      <p><strong>Bus No:</strong> PB-02-A-1234</p>
+                      <p><strong>Departure:</strong> 09:00 AM</p>
+                      <p><strong>Status:</strong> <span className="text-primary font-medium">Ready</span></p>
+                    </div>
+                    <Button 
+                      className="w-full bg-gradient-to-r from-primary to-primary-glow hover:from-primary-glow hover:to-primary"
+                      onClick={handleStartJourneyClick}
+                    >
+                      Start Journey
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                /* Active Journey Card */
+                <Card className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-green-500/20">
+                  <CardHeader className="text-center pb-4">
+                    <div className="mx-auto mb-4 p-3 bg-green-500/10 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
+                      <PlayCircle className="w-8 h-8 text-green-500" />
+                    </div>
+                    <CardTitle className="text-xl">Active Journey</CardTitle>
+                    <CardDescription>
+                      Your journey is currently in progress
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-center space-y-2">
+                      <p><strong>Route:</strong> {activeJourney?.startingPlace} - {activeJourney?.destination}</p>
+                      <p><strong>Bus No:</strong> {activeJourney?.busNumberPlate}</p>
+                      <p><strong>Bus Name:</strong> {activeJourney?.busName}</p>
+                      <p><strong>Status:</strong> <span className="text-green-500 font-medium">In Progress</span></p>
+                    </div>
+                    <Button 
+                      className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+                      onClick={async () => {
+                        try {
+                          // Stop the setInterval directly from frontend
+                          if (locationIntervalId) {
+                            clearInterval(locationIntervalId);
+                            setLocationIntervalId(null);
+                            console.log('Location tracking stopped');
+                          }
+                          
+                          // Disconnect socket
+                          if (socket) {
+                            socket.disconnect();
+                            setSocket(null);
+                          }
+                          
+                          // Call deactivate bus route
+                          const busNumberPlate = localStorage.getItem('driverBusNumberPlate');
+                          if (busNumberPlate) {
+                            const response = await fetch(`http://localhost:3001/api/driver/deactivate-bus/${busNumberPlate}`, {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json'
+                              }
+                            });
+                            
+                            const data = await response.json();
+                            if (data.success) {
+                              console.log('Bus deactivated successfully:', data.message);
+                            } else {
+                              console.error('Error deactivating bus:', data.message);
+                            }
+                          }
+                          
+                          // Reset journey state
+                          alert('Destination reached! Journey completed.');
+                          setIsJourneyActive(false);
+                          setActiveJourney(null);
+                          
+                          // Set journey status to inactive in localStorage
+                          localStorage.setItem('driverJourneyStatus', '0');
+                          setJourneyStatus('0');
+                          localStorage.removeItem('driverBusNumberPlate');
+                        } catch (error) {
+                          console.error('Error in destination reached process:', error);
+                          alert('Error completing journey. Please try again.');
+                        }
+                      }}
+                    >
+                      Destination Reached
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         )}

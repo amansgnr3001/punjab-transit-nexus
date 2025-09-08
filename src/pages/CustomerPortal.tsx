@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, MapPin, Navigation } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Navigation, Loader2, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { usePlaces } from "@/hooks/usePlaces";
+import { useBusSearch } from "@/hooks/useBusSearch";
 
 const CustomerPortal = () => {
   const navigate = useNavigate();
@@ -11,14 +13,37 @@ const CustomerPortal = () => {
   const [startingPoint, setStartingPoint] = useState("");
   const [destination, setDestination] = useState("");
 
+  // Use the custom hooks
+  const { places, loading: placesLoading, error: placesError } = usePlaces();
+  const { searchBuses, loading: searchLoading, error: searchError } = useBusSearch();
+
   const daysOfWeek = [
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
   ];
 
-  const locations = [
-    "Amritsar", "Ludhiana", "Jalandhar", "Patiala", "Bathinda", 
-    "Mohali", "Pathankot", "Hoshiarpur", "Kapurthala", "Moga"
-  ];
+  const handleSearch = async () => {
+    if (!selectedDay || !startingPoint || !destination) {
+      return;
+    }
+
+    try {
+      const buses = await searchBuses(selectedDay, startingPoint, destination);
+      
+      // Navigate to results page with the search results and parameters
+      navigate('/bus-search-results', {
+        state: {
+          buses,
+          searchParams: {
+            day: selectedDay,
+            startingPoint,
+            destination
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Search failed:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background">
@@ -89,16 +114,27 @@ const CustomerPortal = () => {
                   <MapPin className="w-4 h-4 text-secondary" />
                   Starting Point
                 </label>
-                <Select value={startingPoint} onValueChange={setStartingPoint}>
+                <Select value={startingPoint} onValueChange={setStartingPoint} disabled={placesLoading}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select starting location" />
+                    <SelectValue placeholder={placesLoading ? "Loading places..." : "Select starting location"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {locations.map((location) => (
-                      <SelectItem key={location} value={location}>
-                        {location}
-                      </SelectItem>
-                    ))}
+                    {placesLoading ? (
+                      <div className="flex items-center justify-center p-4">
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        Loading places...
+                      </div>
+                    ) : placesError ? (
+                      <div className="p-4 text-center text-red-500">
+                        Error loading places
+                      </div>
+                    ) : (
+                      places.map((place) => (
+                        <SelectItem key={place} value={place}>
+                          {place}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -109,16 +145,27 @@ const CustomerPortal = () => {
                   <Navigation className="w-4 h-4 text-government-green" />
                   Destination
                 </label>
-                <Select value={destination} onValueChange={setDestination}>
+                <Select value={destination} onValueChange={setDestination} disabled={placesLoading}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select destination" />
+                    <SelectValue placeholder={placesLoading ? "Loading places..." : "Select destination"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {locations.map((location) => (
-                      <SelectItem key={location} value={location}>
-                        {location}
-                      </SelectItem>
-                    ))}
+                    {placesLoading ? (
+                      <div className="flex items-center justify-center p-4">
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        Loading places...
+                      </div>
+                    ) : placesError ? (
+                      <div className="p-4 text-center text-red-500">
+                        Error loading places
+                      </div>
+                    ) : (
+                      places.map((place) => (
+                        <SelectItem key={place} value={place}>
+                          {place}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -126,10 +173,28 @@ const CustomerPortal = () => {
               {/* Search Button */}
               <Button 
                 className="w-full mt-6 bg-gradient-to-r from-primary to-primary-glow hover:from-primary-glow hover:to-primary"
-                disabled={!selectedDay || !startingPoint || !destination}
+                disabled={!selectedDay || !startingPoint || !destination || searchLoading}
+                onClick={handleSearch}
               >
-                Search Bus Routes
+                {searchLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4 mr-2" />
+                    Search Bus Routes
+                  </>
+                )}
               </Button>
+
+              {/* Search Error */}
+              {searchError && (
+                <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                  {searchError}
+                </div>
+              )}
 
               {/* Selection Summary */}
               {(selectedDay || startingPoint || destination) && (
