@@ -97,6 +97,64 @@ app.post('/api/municipality/buses', wrap(async (req, res) => {
 		for (let schedule of busData.schedules) {
 			console.log('Processing schedule:', schedule.startingPlace, 'to', schedule.destination);
 			
+			// Geocode starting place
+			try {
+				console.log('Geocoding starting place:', schedule.startingPlace);
+				const startGeocodingUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(schedule.startingPlace)}&key=AIzaSyAzttkphjYlfyEbUoe-5NtAVexKsOI7924`;
+				console.log('Starting place geocoding URL:', startGeocodingUrl);
+				
+				const startGeocodingResponse = await fetch(startGeocodingUrl);
+				const startGeocodingData = await startGeocodingResponse.json();
+				
+				console.log('Starting place geocoding response status:', startGeocodingResponse.status);
+				console.log('Starting place geocoding data:', JSON.stringify(startGeocodingData, null, 2));
+				
+				if (startGeocodingData.status === 'OK' && startGeocodingData.results && startGeocodingData.results.length > 0) {
+					const startLocation = startGeocodingData.results[0].geometry.location;
+					schedule.startLocation.lat = startLocation.lat;
+					schedule.startLocation.long = startLocation.lng;
+					console.log('✅ Got starting place coordinates:', startLocation.lat, startLocation.lng);
+				} else {
+					console.log('❌ No geocoding results for starting place:', schedule.startingPlace, 'Status:', startGeocodingData.status);
+					console.log('❌ Error message:', startGeocodingData.error_message || 'No error message');
+					schedule.startLocation.lat = 0;
+					schedule.startLocation.long = 0;
+				}
+			} catch (startError) {
+				console.error('Error geocoding starting place:', schedule.startingPlace, startError);
+				schedule.startLocation.lat = 0;
+				schedule.startLocation.long = 0;
+			}
+			
+			// Geocode destination
+			try {
+				console.log('Geocoding destination:', schedule.destination);
+				const destGeocodingUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(schedule.destination)}&key=AIzaSyAzttkphjYlfyEbUoe-5NtAVexKsOI7924`;
+				console.log('Destination geocoding URL:', destGeocodingUrl);
+				
+				const destGeocodingResponse = await fetch(destGeocodingUrl);
+				const destGeocodingData = await destGeocodingResponse.json();
+				
+				console.log('Destination geocoding response status:', destGeocodingResponse.status);
+				console.log('Destination geocoding data:', JSON.stringify(destGeocodingData, null, 2));
+				
+				if (destGeocodingData.status === 'OK' && destGeocodingData.results && destGeocodingData.results.length > 0) {
+					const destLocation = destGeocodingData.results[0].geometry.location;
+					schedule.destinationLocation.lat = destLocation.lat;
+					schedule.destinationLocation.long = destLocation.lng;
+					console.log('✅ Got destination coordinates:', destLocation.lat, destLocation.lng);
+				} else {
+					console.log('❌ No geocoding results for destination:', schedule.destination, 'Status:', destGeocodingData.status);
+					console.log('❌ Error message:', destGeocodingData.error_message || 'No error message');
+					schedule.destinationLocation.lat = 0;
+					schedule.destinationLocation.long = 0;
+				}
+			} catch (destError) {
+				console.error('Error geocoding destination:', schedule.destination, destError);
+				schedule.destinationLocation.lat = 0;
+				schedule.destinationLocation.long = 0;
+			}
+			
 			// Process each stop in the schedule
 			for (let stop of schedule.stops) {
 				console.log('Processing stop:', stop.name);

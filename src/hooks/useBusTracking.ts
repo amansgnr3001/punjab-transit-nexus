@@ -5,7 +5,20 @@ interface MiddleStation {
   name: string;
   lat: number;
   long: number;
-  time: number;
+  time: string;
+}
+
+interface MarkerLabel {
+  text: string;
+  color: string;
+  fontSize: string;
+  fontWeight: string;
+}
+
+interface MarkerIcon {
+  url: string;
+  scaledSize: any;
+  anchor: any;
 }
 
 interface ActiveBusDoc {
@@ -16,6 +29,14 @@ interface ActiveBusDoc {
   middlestations: MiddleStation[];
   startingPlace: string;
   destination: string;
+  startingPlaceLocation: {
+    lat: number;
+    long: number;
+  };
+  destinationLocation: {
+    lat: number;
+    long: number;
+  };
   currLat: number;
   currLong: number;
   address: string;
@@ -42,6 +63,7 @@ interface UseBusTrackingReturn {
   startTracking: (busNumberPlate: string) => void;
   stopTracking: () => void;
   error: string | null;
+  busStatus: 'active' | 'reached' | 'unknown';
 }
 
 export const useBusTracking = (): UseBusTrackingReturn => {
@@ -55,6 +77,7 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     title: string;
   }>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [busStatus, setBusStatus] = useState<'active' | 'reached' | 'unknown'>('unknown');
   const socketRef = useRef<Socket | null>(null);
 
   const formatTime = (timeInSeconds: number): string => {
@@ -70,6 +93,66 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     
     const newMarkers = [];
     
+    // Add starting place marker (RED)
+    if (activeBusDoc.startingPlaceLocation && activeBusDoc.startingPlaceLocation.lat && activeBusDoc.startingPlaceLocation.long) {
+      console.log('🎯 Adding starting place marker');
+      const startingPlaceMarker = {
+        position: { lat: activeBusDoc.startingPlaceLocation.lat, lng: activeBusDoc.startingPlaceLocation.long },
+        label: {
+          text: activeBusDoc.startingPlace,
+          color: '#000000',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          className: 'custom-marker-label'
+        },
+        title: `${activeBusDoc.startingPlace} - Starting Point`,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#dc2626"/>
+              <circle cx="12" cy="9" r="3" fill="#ffffff"/>
+            </svg>
+          `),
+          scaledSize: new google.maps.Size(32, 32),
+          anchor: new google.maps.Point(16, 16)
+        }
+      };
+      newMarkers.push(startingPlaceMarker);
+      console.log('✅ Added starting place marker:', startingPlaceMarker);
+    } else {
+      console.log('❌ No starting place location data available');
+    }
+    
+    // Add destination marker (RED)
+    if (activeBusDoc.destinationLocation && activeBusDoc.destinationLocation.lat && activeBusDoc.destinationLocation.long) {
+      console.log('🎯 Adding destination marker');
+      const destinationMarker = {
+        position: { lat: activeBusDoc.destinationLocation.lat, lng: activeBusDoc.destinationLocation.long },
+        label: {
+          text: `${activeBusDoc.destination} (${activeBusDoc.endtime || 'N/A'})`,
+          color: '#000000',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          className: 'custom-marker-label'
+        },
+        title: `${activeBusDoc.destination} - Arrival: ${activeBusDoc.endtime || 'N/A'}`,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#dc2626"/>
+              <circle cx="12" cy="9" r="3" fill="#ffffff"/>
+            </svg>
+          `),
+          scaledSize: new google.maps.Size(32, 32),
+          anchor: new google.maps.Point(16, 16)
+        }
+      };
+      newMarkers.push(destinationMarker);
+      console.log('✅ Added destination marker:', destinationMarker);
+    } else {
+      console.log('❌ No destination location data available');
+    }
+    
     // Create markers for middle stations
     if (activeBusDoc.middlestations && Array.isArray(activeBusDoc.middlestations)) {
       console.log('🎯 Processing middle stations:', activeBusDoc.middlestations.length);
@@ -80,9 +163,25 @@ export const useBusTracking = (): UseBusTrackingReturn => {
         // Validate station data
         if (station && station.lat && station.long && station.name) {
           const marker = {
-            position: { lat: parseFloat(station.lat), lng: parseFloat(station.long) },
-            label: `${station.name} (${station.time ? formatTime(station.time) : 'N/A'})`,
-            title: `${station.name} - Arrival: ${station.time ? formatTime(station.time) : 'N/A'}`
+            position: { lat: station.lat, lng: station.long },
+            label: {
+              text: `${station.name} (${station.time || 'N/A'})`,
+              color: '#000000',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              className: 'custom-marker-label'
+            },
+            title: `${station.name} - Arrival: ${station.time || 'N/A'}`,
+            icon: {
+              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#2563eb"/>
+                  <circle cx="12" cy="9" r="3" fill="#ffffff"/>
+                </svg>
+              `),
+              scaledSize: new google.maps.Size(32, 32),
+              anchor: new google.maps.Point(16, 16)
+            }
           };
           newMarkers.push(marker);
           console.log(`✅ Added station marker ${index}:`, marker);
@@ -98,9 +197,28 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     if (activeBusDoc.currLat && activeBusDoc.currLong) {
       console.log('🎯 Adding current location marker');
       const currentLocationMarker = {
-        position: { lat: parseFloat(activeBusDoc.currLat), lng: parseFloat(activeBusDoc.currLong) },
-        label: '🚌',
-        title: `Current Location - ${activeBusDoc.address || 'Unknown Address'}`
+        position: { lat: activeBusDoc.currLat, lng: activeBusDoc.currLong },
+        title: `Current Location - ${activeBusDoc.address || 'Unknown Address'}`,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="48" height="48" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <!-- Map pin background -->
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#000000"/>
+              <!-- White circle for bus icon -->
+              <circle cx="12" cy="9" r="6" fill="#ffffff"/>
+              <!-- Bus silhouette -->
+              <path d="M8 7h8c1.1 0 2 .9 2 2v3c0 .55-.45 1-1 1h-1v1c0 .55-.45 1-1 1h-1c-.55 0-1-.45-1-1v-1H9v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-1H5c-.55 0-1-.45-1-1V9c0-1.1.9-2 2-2z" fill="#000000"/>
+              <!-- Bus windows -->
+              <rect x="7" y="8" width="2" height="1.5" fill="#ffffff"/>
+              <rect x="10" y="8" width="2" height="1.5" fill="#ffffff"/>
+              <rect x="13" y="8" width="2" height="1.5" fill="#ffffff"/>
+              <!-- Bus door -->
+              <rect x="9.5" y="8" width="1" height="2" fill="#ffffff"/>
+            </svg>
+          `),
+          scaledSize: new google.maps.Size(48, 48),
+          anchor: new google.maps.Point(12, 24)
+        }
       };
       newMarkers.push(currentLocationMarker);
       console.log('✅ Added current location marker:', currentLocationMarker);
@@ -141,6 +259,28 @@ export const useBusTracking = (): UseBusTrackingReturn => {
         console.error('Socket connection error:', error);
         setError('Failed to connect to tracking service');
         setIsTracking(false);
+        setBusStatus('unknown');
+      });
+
+      // Listen for businfo_response to check bus status
+      socket.on('businfo_response', (data) => {
+        console.log('🎯 BUSINFO RESPONSE RECEIVED:', data);
+        
+        if (data.message === 'bus already reached destination') {
+          console.log('❌ Bus has already reached destination');
+          setBusStatus('reached');
+          setError('Bus has already reached its destination');
+          setIsTracking(false);
+        } else if (data.success) {
+          console.log('✅ Bus is active, can start tracking');
+          setBusStatus('active');
+          setError(null);
+        } else {
+          console.log('❌ Bus info error:', data.message);
+          setBusStatus('unknown');
+          setError(data.message || 'Error checking bus status');
+          setIsTracking(false);
+        }
       });
 
       // Listen for real-time bus updates
@@ -192,6 +332,7 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     setCurrentLocation(null);
     setMarkers([]);
     setError(null);
+    setBusStatus('unknown');
   }, []);
 
   // Cleanup on unmount
@@ -211,6 +352,7 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     markers,
     startTracking,
     stopTracking,
-    error
+    error,
+    busStatus
   };
 };

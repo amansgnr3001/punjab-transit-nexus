@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Bus, Clock, MapPin, Navigation, Users, Wifi } from "lucide-react";
-import BusTrackingModal from "@/components/BusTrackingModal";
 
 interface BusSearchResult {
   _id: string;
@@ -31,15 +30,7 @@ const BusSearchResults = () => {
   const [buses, setBuses] = useState<BusSearchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [trackingModal, setTrackingModal] = useState<{
-    isOpen: boolean;
-    busNumberPlate: string;
-    busName: string;
-  }>({
-    isOpen: false,
-    busNumberPlate: '',
-    busName: ''
-  });
+  const [busStatuses, setBusStatuses] = useState<Record<string, 'active' | 'reached' | 'unknown'>>({});
 
   // Get search parameters from location state
   const searchParams = location.state?.searchParams || {};
@@ -258,17 +249,29 @@ const BusSearchResults = () => {
                   {bus.isactive && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <Button 
-                        className="w-full bg-green-600 hover:bg-green-700 text-white"
+                        className={`w-full text-white ${
+                          busStatuses[bus.Bus_number_plate] === 'reached' 
+                            ? 'bg-gray-400 cursor-not-allowed' 
+                            : 'bg-green-600 hover:bg-green-700'
+                        }`}
+                        disabled={busStatuses[bus.Bus_number_plate] === 'reached'}
                         onClick={() => {
-                          setTrackingModal({
-                            isOpen: true,
-                            busNumberPlate: bus.Bus_number_plate,
-                            busName: bus.busName
-                          });
+                          if (busStatuses[bus.Bus_number_plate] !== 'reached') {
+                            // Store bus details in localStorage for the tracking page
+                            localStorage.setItem(`busDetails_${bus.Bus_number_plate}`, JSON.stringify({
+                              busName: bus.busName,
+                              busNumberPlate: bus.Bus_number_plate,
+                              startingPlace: bus.schedule.startingPlace,
+                              destination: bus.schedule.destination
+                            }));
+                            
+                            // Navigate to the tracking page
+                            navigate(`/track-bus/${bus.Bus_number_plate}`);
+                          }
                         }}
                       >
                         <Navigation className="w-4 h-4 mr-2" />
-                        Track Bus
+                        {busStatuses[bus.Bus_number_plate] === 'reached' ? 'Bus Reached Destination' : 'Track Bus'}
                       </Button>
                     </div>
                   )}
@@ -278,13 +281,6 @@ const BusSearchResults = () => {
           </div>
         )}
 
-        {/* Bus Tracking Modal */}
-        <BusTrackingModal
-          isOpen={trackingModal.isOpen}
-          onClose={() => setTrackingModal({ isOpen: false, busNumberPlate: '', busName: '' })}
-          busNumberPlate={trackingModal.busNumberPlate}
-          busName={trackingModal.busName}
-        />
       </main>
     </div>
   );

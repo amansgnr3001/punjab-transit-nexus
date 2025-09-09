@@ -11,13 +11,15 @@ interface BusTrackingModalProps {
   onClose: () => void;
   busNumberPlate: string;
   busName: string;
+  onBusStatusChange?: (busNumberPlate: string, status: 'active' | 'reached' | 'unknown') => void;
 }
 
 const BusTrackingModal: React.FC<BusTrackingModalProps> = ({
   isOpen,
   onClose,
   busNumberPlate,
-  busName
+  busName,
+  onBusStatusChange
 }) => {
   const {
     isTracking,
@@ -27,7 +29,8 @@ const BusTrackingModal: React.FC<BusTrackingModalProps> = ({
     markers,
     startTracking,
     stopTracking,
-    error
+    error,
+    busStatus
   } = useBusTracking();
 
   React.useEffect(() => {
@@ -37,6 +40,13 @@ const BusTrackingModal: React.FC<BusTrackingModalProps> = ({
       stopTracking();
     }
   }, [isOpen, busNumberPlate]);
+
+  // Notify parent component when bus status changes
+  React.useEffect(() => {
+    if (onBusStatusChange && busNumberPlate) {
+      onBusStatusChange(busNumberPlate, busStatus);
+    }
+  }, [busStatus, busNumberPlate, onBusStatusChange]);
 
   const formatTime = (timeInSeconds: number): string => {
     const hours = Math.floor(timeInSeconds / 3600);
@@ -76,11 +86,16 @@ const BusTrackingModal: React.FC<BusTrackingModalProps> = ({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="text-red-800 font-medium">Tracking Error</div>
-              <div className="text-red-600 text-sm">{error}</div>
+          {/* Bus Reached Destination Message */}
+          {busStatus === 'reached' && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                <div className="text-orange-800 font-medium">Bus Reached Destination</div>
+              </div>
+              <div className="text-orange-600 text-sm mt-1">
+                The bus has completed its journey and reached the final destination.
+              </div>
             </div>
           )}
 
@@ -153,7 +168,7 @@ const BusTrackingModal: React.FC<BusTrackingModalProps> = ({
                       <span className="text-sm font-medium text-gray-900">{stop.name}</span>
                     </div>
                     <div className="text-sm text-gray-500">
-                      {formatTime(stop.time)}
+                      {stop.time || 'N/A'}
                     </div>
                   </div>
                 ))}
@@ -169,7 +184,14 @@ const BusTrackingModal: React.FC<BusTrackingModalProps> = ({
             >
               Close Tracking
             </Button>
-            {isTracking && (
+            {busStatus === 'reached' ? (
+              <Button
+                disabled
+                className="flex-1 bg-gray-400 cursor-not-allowed"
+              >
+                Bus Reached Destination
+              </Button>
+            ) : isTracking ? (
               <Button
                 onClick={stopTracking}
                 variant="outline"
@@ -177,7 +199,7 @@ const BusTrackingModal: React.FC<BusTrackingModalProps> = ({
               >
                 Stop Tracking
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
       </DialogContent>

@@ -399,22 +399,83 @@ const DriverPortal = () => {
       <header className="border-b bg-white/95 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => navigate('/')}
-                className="hover:bg-secondary/10"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Home
-              </Button>
-              <h1 className="text-2xl font-bold text-secondary">Driver Portal</h1>
+            <Button 
+              variant="outline" 
+              size="lg" 
+              onClick={() => navigate('/')}
+              className="px-6 py-3"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back to Home
+            </Button>
+            
+            {/* Center - Government of Punjab */}
+            <div className="flex items-center gap-3">
+              {/* Punjab Government Official Logo */}
+              <div className="w-24 h-24 flex items-center justify-center">
+                <svg width="96" height="96" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
+                  {/* Outer Circle */}
+                  <circle cx="48" cy="48" r="45" fill="none" stroke="#000" strokeWidth="2"/>
+                  
+                  {/* Lion Capital - Main Lions */}
+                  <g transform="translate(48, 30) scale(1.2)">
+                    {/* Left Lion (profile) */}
+                    <path d="M-12,0 L-9,-3 L-6,0 L-9,3 Z" fill="#000"/>
+                    <circle cx="-9" cy="-1.5" r="1.5" fill="#000"/>
+                    
+                    {/* Center Lion (front facing) */}
+                    <path d="M-3,-3 L3,-3 L3,3 L-3,3 Z" fill="#000"/>
+                    <circle cx="0" cy="0" r="2" fill="#000"/>
+                    
+                    {/* Right Lion (profile) */}
+                    <path d="M6,0 L9,-3 L12,0 L9,3 Z" fill="#000"/>
+                    <circle cx="9" cy="-1.5" r="1.5" fill="#000"/>
+                  </g>
+                  
+                  {/* Abacus */}
+                  <rect x="24" y="42" width="48" height="12" fill="none" stroke="#000" strokeWidth="1.5"/>
+                  
+                  {/* Dharma Chakra (Wheel) */}
+                  <circle cx="48" cy="48" r="6" fill="none" stroke="#000" strokeWidth="1.5"/>
+                  <circle cx="48" cy="48" r="3" fill="#000"/>
+                  <line x1="48" y1="42" x2="48" y2="54" stroke="#000" strokeWidth="1"/>
+                  <line x1="42" y1="48" x2="54" y2="48" stroke="#000" strokeWidth="1"/>
+                  
+                  {/* Bull (right side) */}
+                  <g transform="translate(60, 48) scale(0.9)">
+                    <ellipse cx="0" cy="0" rx="4.5" ry="3" fill="#000"/>
+                    <path d="M-3,-1.5 L3,-1.5 L3,1.5 L-3,1.5 Z" fill="#000"/>
+                  </g>
+                  
+                  {/* Horse (left side) */}
+                  <g transform="translate(36, 48) scale(0.9)">
+                    <ellipse cx="0" cy="0" rx="4.5" ry="3" fill="#000"/>
+                    <path d="M-3,-1.5 L3,-1.5 L3,1.5 L-3,1.5 Z" fill="#000"/>
+                  </g>
+                  
+                  {/* Motto - सत्यमेव जयते */}
+                  <text x="48" y="72" textAnchor="middle" fontSize="6" fill="#000" fontFamily="serif" fontWeight="bold">
+                    सत्यमेव जयते
+                  </text>
+                  
+                  {/* GOVT. PUNJAB Text */}
+                  <text x="48" y="84" textAnchor="middle" fontSize="5" fill="#000" fontFamily="sans-serif" fontWeight="bold">
+                    GOVT. PUNJAB
+                  </text>
+                </svg>
+              </div>
+              <div className="text-center">
+                <h1 className="text-2xl font-bold text-gray-800">GOVERNMENT OF PUNJAB</h1>
+                <p className="text-sm text-gray-600 font-medium">Driver Portal</p>
+              </div>
             </div>
-            {isLoggedIn && (
+            
+            {isLoggedIn ? (
               <Button variant="outline" onClick={handleLogout}>
                 Logout
               </Button>
+            ) : (
+              <div className="w-20"></div> // Spacer to keep center aligned
             )}
           </div>
         </div>
@@ -588,52 +649,49 @@ const DriverPortal = () => {
 
             <div className="grid md:grid-cols-2 gap-8">
               {/* Your Profile Card */}
-              <Card className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-secondary/20">
+              <Card className="group hover:shadow-md transition-all duration-300 border border-gray-200 bg-white">
                 <CardHeader className="text-center pb-4">
-                  <div className="mx-auto mb-4 p-3 bg-secondary/10 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-secondary/20 transition-colors">
-                    <User className="w-8 h-8 text-secondary" />
+                  <div className="mx-auto mb-4 p-3 bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-gray-200 transition-colors">
+                    <User className="w-8 h-8 text-gray-600" />
                   </div>
-                  <CardTitle className="text-xl">Your Profile</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="text-xl text-gray-800">Your Profile</CardTitle>
+                  <CardDescription className="text-gray-600">
                     View and manage your driver profile information
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="text-center space-y-2">
-                    <p><strong>Driver ID:</strong> {driverData?._id || 'N/A'}</p>
-                    <p><strong>Name:</strong> {driverData?.name || 'N/A'}</p>
-                    <p><strong>Age:</strong> {driverData?.age || 'N/A'}</p>
-                    <p><strong>Contact:</strong> {driverData?.contactNumber || 'N/A'}</p>
-                    <p><strong>Status:</strong> <span className="text-secondary font-medium">Active</span></p>
+                    <p className="text-sm text-gray-700"><strong>Driver ID:</strong> {driverData?._id || 'N/A'}</p>
+                    <p className="text-sm text-gray-700"><strong>Name:</strong> {driverData?.name || 'N/A'}</p>
+                    <p className="text-sm text-gray-700"><strong>Age:</strong> {driverData?.age || 'N/A'}</p>
+                    <p className="text-sm text-gray-700"><strong>Contact:</strong> {driverData?.contactNumber || 'N/A'}</p>
+                    <p className="text-sm text-gray-700"><strong>Status:</strong> <span className="text-gray-600 font-medium">Active</span></p>
                   </div>
-                  <Button variant="secondary" className="w-full">
-                    Edit Profile
-                  </Button>
                 </CardContent>
               </Card>
 
               {/* Journey Card */}
               {journeyStatus !== '1' ? (
                 /* Start Journey Card */
-                <Card className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/20">
+                <Card className="group hover:shadow-md transition-all duration-300 border border-gray-200 bg-white">
                   <CardHeader className="text-center pb-4">
-                    <div className="mx-auto mb-4 p-3 bg-primary/10 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                      <PlayCircle className="w-8 h-8 text-primary" />
+                    <div className="mx-auto mb-4 p-3 bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-gray-200 transition-colors">
+                      <PlayCircle className="w-8 h-8 text-gray-600" />
                     </div>
-                    <CardTitle className="text-xl">Start Journey</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-xl text-gray-800">Start Journey</CardTitle>
+                    <CardDescription className="text-gray-600">
                       Begin your assigned route and track your journey
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="text-center space-y-2">
-                      <p><strong>Next Route:</strong> Amritsar - Ludhiana</p>
-                      <p><strong>Bus No:</strong> PB-02-A-1234</p>
-                      <p><strong>Departure:</strong> 09:00 AM</p>
-                      <p><strong>Status:</strong> <span className="text-primary font-medium">Ready</span></p>
+                      <p className="text-sm text-gray-700"><strong>Next Route:</strong> Amritsar - Ludhiana</p>
+                      <p className="text-sm text-gray-700"><strong>Bus No:</strong> PB-02-A-1234</p>
+                      <p className="text-sm text-gray-700"><strong>Departure:</strong> 09:00 AM</p>
+                      <p className="text-sm text-gray-700"><strong>Status:</strong> <span className="text-gray-600 font-medium">Ready</span></p>
                     </div>
                     <Button 
-                      className="w-full bg-gradient-to-r from-primary to-primary-glow hover:from-primary-glow hover:to-primary"
+                      className="w-full bg-gray-800 hover:bg-gray-900 text-white"
                       onClick={handleStartJourneyClick}
                     >
                       Start Journey
@@ -642,25 +700,25 @@ const DriverPortal = () => {
                 </Card>
               ) : (
                 /* Active Journey Card */
-                <Card className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-green-500/20">
+                <Card className="group hover:shadow-md transition-all duration-300 border border-gray-200 bg-white">
                   <CardHeader className="text-center pb-4">
-                    <div className="mx-auto mb-4 p-3 bg-green-500/10 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
-                      <PlayCircle className="w-8 h-8 text-green-500" />
+                    <div className="mx-auto mb-4 p-3 bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-gray-200 transition-colors">
+                      <PlayCircle className="w-8 h-8 text-gray-600" />
                     </div>
-                    <CardTitle className="text-xl">Active Journey</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-xl text-gray-800">Active Journey</CardTitle>
+                    <CardDescription className="text-gray-600">
                       Your journey is currently in progress
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="text-center space-y-2">
-                      <p><strong>Route:</strong> {activeJourney?.startingPlace} - {activeJourney?.destination}</p>
-                      <p><strong>Bus No:</strong> {activeJourney?.busNumberPlate}</p>
-                      <p><strong>Bus Name:</strong> {activeJourney?.busName}</p>
-                      <p><strong>Status:</strong> <span className="text-green-500 font-medium">In Progress</span></p>
+                      <p className="text-sm text-gray-700"><strong>Route:</strong> {activeJourney?.startingPlace} - {activeJourney?.destination}</p>
+                      <p className="text-sm text-gray-700"><strong>Bus No:</strong> {activeJourney?.busNumberPlate}</p>
+                      <p className="text-sm text-gray-700"><strong>Bus Name:</strong> {activeJourney?.busName}</p>
+                      <p className="text-sm text-gray-700"><strong>Status:</strong> <span className="text-gray-600 font-medium">In Progress</span></p>
                     </div>
                     <Button 
-                      className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+                      className="w-full bg-gray-800 hover:bg-gray-900 text-white"
                       onClick={async () => {
                         try {
                           // Stop the setInterval directly from frontend

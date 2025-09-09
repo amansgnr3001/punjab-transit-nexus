@@ -31,7 +31,7 @@ const trackingSchema = new mongoose.Schema({
       required: true
     },
     time: {
-      type: Number,
+      type: String,
       required: true
     }
   }],
@@ -42,6 +42,26 @@ const trackingSchema = new mongoose.Schema({
   destination: {
     type: String,
     required: true
+  },
+  startingPlaceLocation: {
+    lat: {
+      type: Number,
+      required: true
+    },
+    long: {
+      type: Number,
+      required: true
+    }
+  },
+  destinationLocation: {
+    lat: {
+      type: Number,
+      required: true
+    },
+    long: {
+      type: Number,
+      required: true
+    }
   },
   currLat: {
     type: Number,
@@ -65,24 +85,18 @@ const trackingSchema = new mongoose.Schema({
   }
 });
 
-// Post middleware to auto-delete inactive buses after 30 minutes
+// Post middleware to immediately delete inactive buses
 trackingSchema.post('save', async function(doc) {
 	if (doc.isactive === false) {
-		console.log(`Bus ${doc.busNumberPlate} marked as inactive. Will be deleted in 30 minutes.`);
+		console.log(`Bus ${doc.busNumberPlate} marked as inactive. Deleting immediately.`);
 		
-		// Set a timeout to delete the document after 30 minutes
-		setTimeout(async () => {
-			try {
-				// Check if the document still exists and is still inactive
-				const existingDoc = await this.constructor.findOne({ _id: doc._id });
-				if (existingDoc && existingDoc.isactive === false) {
-					await this.constructor.findByIdAndDelete(doc._id);
-					console.log(`Bus ${doc.busNumberPlate} automatically deleted after 30 minutes of inactivity.`);
-				}
-			} catch (error) {
-				console.error('Error auto-deleting inactive bus:', error);
-			}
-		}, 30 * 60 * 1000); // 30 minutes
+		try {
+			// Immediately delete the document when isactive is false
+			await this.constructor.findByIdAndDelete(doc._id);
+			console.log(`Bus ${doc.busNumberPlate} automatically deleted immediately after becoming inactive.`);
+		} catch (error) {
+			console.error('Error auto-deleting inactive bus:', error);
+		}
 	}
 });
 

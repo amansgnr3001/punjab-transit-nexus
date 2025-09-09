@@ -22,6 +22,14 @@ const MunicipalityPortal = () => {
       endtime: "",
       startingPlace: "",
       destination: "",
+      startLocation: {
+        lat: 0,
+        long: 0
+      },
+      destinationLocation: {
+        lat: 0,
+        long: 0
+      },
       stops: [{ name: "" }],
       days: [""]
     }]
@@ -96,6 +104,14 @@ const MunicipalityPortal = () => {
         endtime: "",
         startingPlace: "",
         destination: "",
+        startLocation: {
+          lat: 0,
+          long: 0
+        },
+        destinationLocation: {
+          lat: 0,
+          long: 0
+        },
         stops: [{ name: "" }],
         days: [""]
       }]
@@ -115,6 +131,14 @@ const MunicipalityPortal = () => {
       ...busForm,
       schedules: busForm.schedules.map(schedule => ({
         ...schedule,
+        startLocation: {
+          lat: 0,
+          long: 0
+        },
+        destinationLocation: {
+          lat: 0,
+          long: 0
+        },
         stops: schedule.stops.map(stop => ({
           ...stop,
           lat: 0,
@@ -144,6 +168,14 @@ const MunicipalityPortal = () => {
             endtime: "",
             startingPlace: "",
             destination: "",
+            startLocation: {
+              lat: 0,
+              long: 0
+            },
+            destinationLocation: {
+              lat: 0,
+              long: 0
+            },
             stops: [{ name: "" }],
             days: [""]
           }]

@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const http = require('http');
 const { Server } = require('socket.io');
 const fetch = require('node-fetch');
+const { decode } = require('@googlemaps/polyline-codec');
 require('dotenv').config();
 
 const app = express();
@@ -22,6 +23,60 @@ const Bus = require('../models/Bus');
 const Driver = require('../models/Driver');
 const User = require('../models/Municipality');
 const Tracking = require('../models/activebuses');
+
+// Helper function to find closest point on route
+function findClosestPointOnRoute(location, routePoints) {
+	let closestPoint = routePoints[0];
+	let closestDistance = getDistance(location, routePoints[0]);
+	
+	for (let i = 1; i < routePoints.length; i++) {
+		const distance = getDistance(location, routePoints[i]);
+		if (distance < closestDistance) {
+			closestDistance = distance;
+			closestPoint = routePoints[i];
+		}
+	}
+	
+	return closestPoint;
+}
+
+// Helper function to calculate distance between two points
+function getDistance(point1, point2) {
+	const R = 6371e3; // Earth's radius in meters
+	const φ1 = point1.lat * Math.PI/180;
+	const φ2 = point2.lat * Math.PI/180;
+	const Δφ = (point2.lat - point1.lat) * Math.PI/180;
+	const Δλ = (point2.lng - point1.lng) * Math.PI/180;
+
+	const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+		Math.cos(φ1) * Math.cos(φ2) *
+		Math.sin(Δλ/2) * Math.sin(Δλ/2);
+	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+	return R * c; // Distance in meters
+}
+
+// Helper function to find position index on route
+function findPositionIndexOnRoute(location, routePoints) {
+	let closestIndex = 0;
+	let closestDistance = getDistance(location, routePoints[0]);
+	
+	for (let i = 1; i < routePoints.length; i++) {
+		const distance = getDistance(location, routePoints[i]);
+		if (distance < closestDistance) {
+			closestDistance = distance;
+			closestIndex = i;
+		}
+	}
+	
+	return closestIndex;
+}
+
+// Helper function to check if bus has crossed a station
+function hasBusCrossedStation(busPositionIndex, stationPositionIndex) {
+	return busPositionIndex > stationPositionIndex;
+}
+
 // CORS Configuration
 const corsOptions = {
   origin: [
@@ -109,7 +164,7 @@ io.on('connection', (socket) => {
 			console.log('🗺️ Waypoints:', waypoints);
 			
 			// Get directions from current location to destination via waypoints
-			const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(curr_address)}&destination=${encodeURIComponent(activeBusDoc.destination)}&waypoints=${encodeURIComponent(waypoints)}&key=AIzaSyAzttkphjYlfyEbUoe-5NtAVexKsOI7924`;
+			const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${lat},${long}&destination=${encodeURIComponent(activeBusDoc.destination)}&waypoints=${encodeURIComponent(waypoints)}&key=AIzaSyAzttkphjYlfyEbUoe-5NtAVexKsOI7924`;
 			console.log('🗺️ Directions URL:', directionsUrl);
 			
 			const directionsResponse = await fetch(directionsUrl);
@@ -125,22 +180,71 @@ io.on('connection', (socket) => {
 			}
 			console.log('✅ Directions successful');
 
-			// Get current time
-			const curr_time = new Date();
+			// Get current time in 12-hour format (e.g., "2:30 PM")
+			const curr_time = new Date().toLocaleTimeString('en-US', {
+				hour: 'numeric',
+				minute: '2-digit',
+				hour12: true
+			});
+
+			// Extract polyline first
+			const polyline = directionsData.routes[0].overview_polyline.points;
+			console.log('🗺️ Polyline extracted:', polyline ? 'SUCCESS' : 'FAILED');
+			console.log('🗺️ Polyline length:', polyline ? polyline.length : 0);
 
 			// Process legs and update timing data
 			const legs = directionsData.routes[0].legs;
 			
-			// Update middle stations timing
+			// Update middle stations timing with flag optimization
+			const routePoints = decode(polyline);
+			const busLocation = { lat: lat, lng: long };
+			const busPositionIndex = findPositionIndexOnRoute(busLocation, routePoints);
+			
+			let x = 0; // Flag variable
+			let currentTime = new Date();
+			
 			for (let i = 0; i < legs.length - 1; i++) {
 				if (activeBusDoc.middlestations[i]) {
-					activeBusDoc.middlestations[i].time = legs[i].duration.value;
+					if (x === 0) {
+						// Check if bus has crossed this station
+						const stationLocation = { 
+							lat: activeBusDoc.middlestations[i].lat, 
+							lng: activeBusDoc.middlestations[i].long 
+						};
+						const stationPositionIndex = findPositionIndexOnRoute(stationLocation, routePoints);
+						
+						if (hasBusCrossedStation(busPositionIndex, stationPositionIndex)) {
+							continue; // Skip ETA calculation for crossed stations
+						} else {
+							x = 1; // Set flag, bus hasn't crossed this station yet
+						}
+					}
+					// If x === 1, just calculate ETA (don't check if crossed)
+					
+					// Calculate actual arrival time based on current time
+					const arrivalTime = new Date(currentTime.getTime() + (legs[i].duration.value * 1000));
+					const arrivalTimeString = arrivalTime.toLocaleTimeString('en-US', {
+						hour: 'numeric',
+						minute: '2-digit',
+						hour12: true
+					});
+					activeBusDoc.middlestations[i].time = arrivalTimeString;
+					
+					// Update current time to this station's arrival time for next calculation
+					currentTime = arrivalTime;
 				}
 			}
 
-			// Update endtime with last leg duration
+			// Update endtime with destination arrival time
 			if (legs.length > 0) {
-				activeBusDoc.endtime = legs[legs.length - 1].duration.value;
+				// Calculate destination arrival time based on current time + last leg duration
+				const destinationArrivalTime = new Date(currentTime.getTime() + (legs[legs.length - 1].duration.value * 1000));
+				const destinationArrivalTimeString = destinationArrivalTime.toLocaleTimeString('en-US', {
+					hour: 'numeric',
+					minute: '2-digit',
+					hour12: true
+				});
+				activeBusDoc.endtime = destinationArrivalTimeString;
 			}
 
 		// Update current address
@@ -156,9 +260,6 @@ io.on('connection', (socket) => {
 				currLong: long
 			});
 
-			// Extract polyline
-			const polyline = directionsData.routes[0].overview_polyline.points;
-
 			// Save updated document
 		console.log('💾 Saving document to database...');
 		await activeBusDoc.save();
@@ -173,6 +274,8 @@ io.on('connection', (socket) => {
 			// Send response with updated document and polyline to all clients in the bus room
 			console.log('📡 Broadcasting to room:', busnumberplate);
 			console.log('📡 Room members count:', io.sockets.adapter.rooms.get(busnumberplate)?.size || 0);
+			console.log('📡 Broadcast data - activeBus:', activeBusDoc ? 'EXISTS' : 'MISSING');
+			console.log('📡 Broadcast data - polyline:', polyline ? 'EXISTS' : 'MISSING');
 			io.to(busnumberplate).emit('broadcast_response', {
 				success: true,
 				activeBus: activeBusDoc,
@@ -187,7 +290,7 @@ io.on('connection', (socket) => {
 	});
 
 	// Businfo event for passengers
-	socket.on('businfo', (data) => {
+	socket.on('businfo', async (data) => {
 		try {
 			const { busnumberplate } = data;
 			
@@ -197,19 +300,58 @@ io.on('connection', (socket) => {
 			// Validate required data
 			if (!busnumberplate) {
 				console.log('❌ Missing busnumberplate');
-				socket.emit('error', { message: 'Missing required field: busnumberplate' });
+				socket.emit('businfo_response', {
+					success: false,
+					message: 'Missing required field: busnumberplate'
+				});
 				return;
 			}
 
-			// Add socket to the bus room
+			// Retrieve document from activebuses schema
+			console.log('🔍 Checking bus status in database...');
+			const activeBusDoc = await Tracking.findOne({ busNumberPlate: busnumberplate });
+			
+			if (!activeBusDoc) {
+				console.log('❌ Bus not found in database:', busnumberplate);
+				socket.emit('businfo_response', {
+					success: false,
+					message: 'Bus not found'
+				});
+				return;
+			}
+			
+			console.log('✅ Bus found in database:', activeBusDoc.busName);
+			console.log('🔍 Bus active status:', activeBusDoc.isactive);
+			
+			// Check isactive field
+			if (activeBusDoc.isactive === false) {
+				console.log('❌ Bus already reached destination');
+				socket.emit('businfo_response', {
+					success: false,
+					message: 'Bus already reached destination'
+				});
+				socket.disconnect();
+				return;
+			}
+			
+			// If isactive is true, allow passenger to join room
+			console.log('✅ Bus is active, allowing passenger to join room');
 			socket.join(busnumberplate);
 			console.log(`✅ Socket joined room: ${busnumberplate}`);
 			
-		
+			// Send confirmation response
+			socket.emit('businfo_response', {
+				success: true,
+				message: `Successfully joined room for bus ${busnumberplate}`,
+				room: busnumberplate
+			});
 			
 		} catch (error) {
 			console.error('Error in businfo event:', error);
-			socket.emit('error', { message: 'Error joining bus room' });
+			socket.emit('businfo_response', {
+				success: false,
+				message: 'Error checking bus status'
+			});
 		}
 	});
 
@@ -473,6 +615,14 @@ app.post('/api/driver/start-journey', wrap(async (req, res) => {
 			})),
 			startingPlace,
 			destination,
+			startingPlaceLocation: {
+				lat: matchingSchedule.startLocation.lat,
+				long: matchingSchedule.startLocation.long
+			},
+			destinationLocation: {
+				lat: matchingSchedule.destinationLocation.lat,
+				long: matchingSchedule.destinationLocation.long
+			},
 			address: startingPlace, // Set address equal to startingPlace
 			currLat: 0,
 			currLong: 0,

@@ -5,8 +5,19 @@ import { decode } from '@googlemaps/polyline-codec';
 interface BusTrackingMapProps {
   markers: Array<{
     position: { lat: number; lng: number };
-    label: string;
+    label: string | {
+      text: string;
+      color: string;
+      fontSize: string;
+      fontWeight: string;
+      className?: string;
+    };
     title: string;
+    icon?: {
+      url: string;
+      scaledSize: any;
+      anchor: any;
+    };
   }>;
   polyline: string | null;
   currentLocation: { lat: number; lng: number } | null;
@@ -15,7 +26,7 @@ interface BusTrackingMapProps {
 
 const mapContainerStyle = {
   width: '100%',
-  height: '400px'
+  height: '600px'
 };
 
 const defaultCenter = {
@@ -133,18 +144,106 @@ const BusTrackingMap: React.FC<BusTrackingMapProps> = ({
         options={{
           streetViewControl: false,
           mapTypeControl: false,
-          fullscreenControl: false
+          fullscreenControl: false,
+          styles: [
+            {
+              featureType: "all",
+              elementType: "labels.text.fill",
+              stylers: [{ color: "#666666" }]
+            },
+            {
+              featureType: "all",
+              elementType: "labels.text.stroke",
+              stylers: [{ color: "#ffffff" }]
+            },
+            {
+              featureType: "road",
+              elementType: "geometry",
+              stylers: [{ color: "#f0f0f0" }]
+            },
+            {
+              featureType: "road.highway",
+              elementType: "geometry",
+              stylers: [{ color: "#e0e0e0" }]
+            },
+            {
+              featureType: "road.arterial",
+              elementType: "geometry",
+              stylers: [{ color: "#f0f0f0" }]
+            },
+            {
+              featureType: "road.local",
+              elementType: "geometry",
+              stylers: [{ color: "#f8f8f8" }]
+            },
+            {
+              featureType: "road.local",
+              elementType: "labels",
+              stylers: [{ visibility: "off" }]
+            },
+            {
+              featureType: "road.arterial",
+              elementType: "labels",
+              stylers: [{ visibility: "off" }]
+            },
+            {
+              featureType: "road.highway",
+              elementType: "labels",
+              stylers: [{ visibility: "off" }]
+            },
+            {
+              featureType: "poi",
+              stylers: [{ visibility: "off" }]
+            },
+            {
+              featureType: "transit",
+              stylers: [{ visibility: "off" }]
+            },
+            {
+              featureType: "administrative",
+              stylers: [{ visibility: "off" }]
+            },
+            {
+              featureType: "landscape",
+              elementType: "geometry",
+              stylers: [{ color: "#ffffff" }]
+            },
+            {
+              featureType: "water",
+              elementType: "geometry",
+              stylers: [{ color: "#e6f3ff" }]
+            },
+            {
+              featureType: "water",
+              elementType: "labels",
+              stylers: [{ visibility: "simplified" }]
+            }
+          ]
         }}
       >
         {/* Render markers */}
         {markers.map((marker, index) => {
           console.log(`🗺️ Rendering marker ${index}:`, marker);
+          
+          // Custom icon for bus location (white car with red accents)
+          const isBusLocation = typeof marker.label === 'string' && marker.label === '🚌';
+          const customIcon = isBusLocation ? {
+            path: 'M5,6L19,6L19,18L5,18L5,6M7,8L17,8L17,16L7,16L7,8M6,10L8,10L8,14L6,14L6,10M16,10L18,10L18,14L16,14L16,10M5,18L7,20L17,20L19,18L5,18Z',
+            fillColor: '#ffffff',
+            fillOpacity: 1,
+            strokeColor: '#ff0000',
+            strokeWeight: 2,
+            scale: 1.8,
+            anchor: new google.maps.Point(12, 12)
+          } : marker.icon;
+
           return (
             <Marker
               key={index}
               position={marker.position}
               label={marker.label}
               title={marker.title}
+              icon={customIcon}
             />
           );
         })}
@@ -157,9 +256,9 @@ const BusTrackingMap: React.FC<BusTrackingMapProps> = ({
             <Polyline
               path={polylinePath}
               options={{
-                strokeColor: '#3B82F6',
+                strokeColor: '#000000',
                 strokeOpacity: 1.0,
-                strokeWeight: 4,
+                strokeWeight: 6,
                 geodesic: true
               }}
             />

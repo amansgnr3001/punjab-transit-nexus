@@ -26,6 +26,26 @@ const busSchema = new mongoose.Schema({
       type: String,
       required: true
     },
+    startLocation: {
+      lat: {
+        type: Number,
+        required: true
+      },
+      long: {
+        type: Number,
+        required: true
+      }
+    },
+    destinationLocation: {
+      lat: {
+        type: Number,
+        required: true
+      },
+      long: {
+        type: Number,
+        required: true
+      }
+    },
     stops: [{
       name: {
         type: String,
