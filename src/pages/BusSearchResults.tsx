@@ -63,10 +63,13 @@ const BusSearchResults = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading search results...</p>
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-900"></div>
+          </div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Loading search results</h3>
+          <p className="text-gray-500">Please wait while we find the best routes for you</p>
         </div>
       </div>
     );
@@ -74,67 +77,92 @@ const BusSearchResults = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-red-600">Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => navigate('/customer-portal')} className="w-full">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Search
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center shadow-sm max-w-md">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+              <span className="text-red-600 font-bold text-lg">!</span>
+            </div>
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-3">Something went wrong</h3>
+          <p className="text-gray-500 mb-8">{error}</p>
+          <Button 
+            onClick={() => navigate('/customer-portal')} 
+            className="bg-gray-900 hover:bg-gray-800 text-white px-8 py-3 rounded-lg font-semibold"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Search
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-6 py-4">
+      <header className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={() => navigate('/customer-portal')}
-                className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                className="text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-lg transition-colors"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
+                Back to Search
               </Button>
-              <div className="h-6 w-px bg-gray-300"></div>
-              <h1 className="text-xl font-semibold text-gray-900">Search Results</h1>
+              <div className="h-8 w-px bg-gray-200"></div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Search Results</h1>
+                <p className="text-sm text-gray-500 mt-1">Find your perfect bus route</p>
+              </div>
             </div>
-            <div className="text-sm text-gray-500">
-              {buses.length} result{buses.length !== 1 ? 's' : ''} found
+            <div className="text-right">
+              <div className="text-lg font-semibold text-gray-900">{buses.length}</div>
+              <div className="text-sm text-gray-500">result{buses.length !== 1 ? 's' : ''} found</div>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-6 py-12">
         {/* Search Summary */}
-        <div className="mb-8">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center gap-6 text-sm">
-              <div className="flex items-center gap-2 text-gray-600">
-                <Clock className="w-4 h-4" />
-                <span className="font-medium">{searchParams.day}</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-600">
-                <MapPin className="w-4 h-4" />
-                <span className="font-medium">{searchParams.startingPoint}</span>
-              </div>
-              <div className="text-gray-400">→</div>
-              <div className="flex items-center gap-2 text-gray-600">
-                <Navigation className="w-4 h-4" />
-                <span className="font-medium">{searchParams.destination}</span>
+        <div className="mb-10">
+          <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-gray-600" />
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Travel Date</div>
+                    <div className="font-semibold text-gray-900">{searchParams.day}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <MapPin className="w-5 h-5 text-gray-600" />
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">From</div>
+                    <div className="font-semibold text-gray-900">{searchParams.startingPoint}</div>
+                  </div>
+                </div>
+                <div className="text-gray-300 text-2xl">→</div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <Navigation className="w-5 h-5 text-gray-600" />
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">To</div>
+                    <div className="font-semibold text-gray-900">{searchParams.destination}</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -142,101 +170,119 @@ const BusSearchResults = () => {
 
         {/* Bus Results */}
         {buses.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <Bus className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No buses found</h3>
-            <p className="text-gray-500 mb-6">
-              We couldn't find any buses for your selected route and day.
+          <div className="bg-white rounded-xl border border-gray-200 p-16 text-center shadow-sm">
+            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Bus className="w-10 h-10 text-gray-400" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-3">No buses found</h3>
+            <p className="text-gray-500 mb-8 max-w-md mx-auto">
+              We couldn't find any buses for your selected route and day. Try adjusting your search criteria.
             </p>
             <Button 
               onClick={() => navigate('/customer-portal')}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-gray-900 hover:bg-gray-800 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
             >
               Try Different Search
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {buses.map((bus) => (
               <div 
                 key={bus._id} 
-                className={`bg-white rounded-lg border transition-all hover:shadow-sm ${
-                  bus.isactive ? 'border-green-200 bg-green-50/30' : 'border-gray-200'
-                }`}
+                className="bg-white rounded-xl border border-gray-200 transition-all hover:shadow-lg hover:border-gray-300 shadow-sm"
               >
-                <div className="p-6">
+                <div className="p-8">
                   {/* Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <Bus className="w-5 h-5 text-gray-600" />
-                        <h3 className="text-lg font-semibold text-gray-900">{bus.busName}</h3>
-                        <span className="text-sm text-gray-500">#{bus.Bus_number_plate}</span>
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <Bus className="w-6 h-6 text-gray-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-1">{bus.busName}</h3>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-500">Bus #{bus.Bus_number_plate}</span>
+                          <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
+                          <span className="text-sm text-gray-500">Route ID: {bus._id.slice(-6)}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    <div className="flex items-center gap-3">
+                      <div className={`px-3 py-1.5 rounded-full text-sm font-semibold ${
                         bus.isactive 
-                          ? 'bg-green-100 text-green-800' 
+                          ? 'bg-gray-900 text-white' 
                           : 'bg-gray-100 text-gray-600'
                       }`}>
                         {bus.isactive ? 'Active' : 'Inactive'}
                       </div>
                       {bus.isactive && (
-                        <div className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-full text-xs">
-                          <Wifi className="w-3 h-3" />
-                          Live
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 text-gray-700 rounded-full text-sm font-medium">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                          Live Tracking
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* Content */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Route */}
-                    <div>
-                      <div className="text-sm font-medium text-gray-500 mb-2">Route</div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <span className="text-gray-900">{bus.schedule.startingPlace}</span>
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <MapPin className="w-5 h-5 text-gray-600" />
+                        <h4 className="font-semibold text-gray-900">Route</h4>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 bg-gray-900 rounded-full"></div>
+                          <span className="font-medium text-gray-900">{bus.schedule.startingPlace}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span className="text-gray-900">{bus.schedule.destination}</span>
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                          <span className="font-medium text-gray-900">{bus.schedule.destination}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Timing */}
-                    <div>
-                      <div className="text-sm font-medium text-gray-500 mb-2">Timing</div>
-                      <div className="space-y-1">
-                        <div className="text-sm text-gray-900">
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Clock className="w-5 h-5 text-gray-600" />
+                        <h4 className="font-semibold text-gray-900">Schedule</h4>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="text-lg font-bold text-gray-900">
                           {formatTime(bus.schedule.starttime)} - {formatTime(bus.schedule.endtime)}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-sm text-gray-500">
                           Duration: {formatDuration(bus.schedule.starttime, bus.schedule.endtime)}
                         </div>
                       </div>
                     </div>
 
                     {/* Stops */}
-                    <div>
-                      <div className="text-sm font-medium text-gray-500 mb-2">
-                        Stops ({bus.schedule.stops?.length || 0})
+                    <div className="bg-gray-50 rounded-lg p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Users className="w-5 h-5 text-gray-600" />
+                        <h4 className="font-semibold text-gray-900">
+                          Stops ({bus.schedule.stops?.length || 0})
+                        </h4>
                       </div>
                       <div className="text-sm text-gray-600">
                         {bus.schedule.stops && bus.schedule.stops.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {bus.schedule.stops.map((stop, index) => (
-                              <span key={index}>
-                                {stop.name}
-                                {index < bus.schedule.stops.length - 1 && (
-                                  <span className="text-gray-400 mx-1">→</span>
-                                )}
-                              </span>
+                          <div className="space-y-1">
+                            {bus.schedule.stops.slice(0, 3).map((stop, index) => (
+                              <div key={index} className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
+                                <span className="text-gray-700">{stop.name}</span>
+                              </div>
                             ))}
+                            {bus.schedule.stops.length > 3 && (
+                              <div className="text-gray-500 text-xs mt-2">
+                                +{bus.schedule.stops.length - 3} more stops
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <span className="text-gray-400">No stops available</span>
@@ -247,12 +293,12 @@ const BusSearchResults = () => {
 
                   {/* Track Button for Active Buses */}
                   {bus.isactive && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="mt-8 pt-6 border-t border-gray-200">
                       <Button 
-                        className={`w-full text-white ${
+                        className={`w-full py-4 text-lg font-semibold rounded-lg transition-all ${
                           busStatuses[bus.Bus_number_plate] === 'reached' 
-                            ? 'bg-gray-400 cursor-not-allowed' 
-                            : 'bg-green-600 hover:bg-green-700'
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                            : 'bg-gray-900 hover:bg-gray-800 text-white hover:shadow-lg'
                         }`}
                         disabled={busStatuses[bus.Bus_number_plate] === 'reached'}
                         onClick={async () => {
@@ -297,8 +343,8 @@ const BusSearchResults = () => {
                           }
                         }}
                       >
-                        <Navigation className="w-4 h-4 mr-2" />
-                        {busStatuses[bus.Bus_number_plate] === 'reached' ? 'Bus Reached Destination' : 'Track Bus'}
+                        <Navigation className="w-5 h-5 mr-3" />
+                        {busStatuses[bus.Bus_number_plate] === 'reached' ? 'Bus Reached Destination' : 'Track This Bus'}
                       </Button>
                     </div>
                   )}

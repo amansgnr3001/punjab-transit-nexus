@@ -1,10 +1,33 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
-import { Truck, Users, Building2, MapPin, Clock, Shield, ArrowRight } from "lucide-react";
+import { Truck, Users, Building2, MapPin, Clock, Shield, ArrowRight, Mail, Phone, Twitter, Facebook, Instagram, Globe } from "lucide-react";
+import { useState, useEffect } from "react";
 
 const Index = () => {
   const navigate = useNavigate();
+  
+  // Sliding images state
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+  
+  const backgroundImages = [
+    "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?fm=jpg&q=60&w=3000&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8YnVzfGVufDB8fDB8fHww",
+    "https://www.zingbus.com/blog/wp-content/uploads/2025/03/DALL%C2%B7E-2025-03-11-16.20.05-A-hyper-realistic-depiction-of-the-impact-of-electric-buses-on-public-transportation-in-India.-A-modern-well-designed-electric-bus-is-parked-at-a-bus.webp",
+    "https://bus-news.com/wp-content/uploads/sites/4/2024/01/India-Tata-Motors-Supplies-100-Electric-Buses-to-ASTC.jpeg",
+    "https://t4.ftcdn.net/jpg/02/69/47/51/360_F_269475198_k41qahrZ1j4RK1sarncMiFHpcmE2qllQ.jpg"
+  ];
+
+  // Auto-slide images every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => 
+        (prevIndex + 1) % backgroundImages.length
+      );
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [backgroundImages.length]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-indigo-100">
@@ -40,7 +63,7 @@ const Index = () => {
 
             {/* Center - Main Title */}
             <div className="text-center">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">Punjab Transit Nexus</h1>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">Punjab Transport</h1>
             </div>
 
             {/* Right Side - Tracking/Road Image */}
@@ -65,8 +88,41 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="py-20 bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 text-white relative overflow-hidden">
+      {/* Hero Section with Sliding Images */}
+      <section className="py-20 text-white relative overflow-hidden min-h-[600px] flex items-center">
+        {/* Background Images with Blur Effect */}
+        <div className="absolute inset-0 z-0">
+          {backgroundImages.map((image, index) => (
+            <div
+              key={index}
+              className={`absolute inset-0 transition-all duration-1000 ease-in-out ${
+                index === currentImageIndex ? 'opacity-100 scale-100' : 'opacity-0 scale-110'
+              }`}
+            >
+              <img
+                src={image}
+                alt={`Background ${index + 1}`}
+                className="w-full h-full object-cover scale-105"
+                style={{
+                  filter: 'brightness(0.8) contrast(1.1)',
+                  transform: 'scale(1.05)',
+                  transition: 'transform 0.3s ease-in-out'
+                }}
+                onLoad={() => {
+                  if (index === 0) setImagesLoaded(true);
+                }}
+                onError={(e) => {
+                  console.log(`Background image ${index + 1} failed to load`);
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+              {/* Blur overlay */}
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Content */}
         <div className="container mx-auto px-4 text-center relative z-10">
           <h2 className="text-5xl font-bold mb-6 leading-tight">
             Modern Transportation
@@ -114,7 +170,23 @@ const Index = () => {
           <div className="absolute top-10 left-10 w-20 h-20 bg-white/20 rounded-full blur-xl"></div>
           <div className="absolute top-20 right-20 w-32 h-32 bg-cyan-300/30 rounded-full blur-2xl"></div>
           <div className="absolute bottom-20 left-1/4 w-24 h-24 bg-blue-300/30 rounded-full blur-xl"></div>
-          <div className="absolute bottom-10 right-10 w-16 h-16 bg-indigo-300/30 rounded-full blur-lg"></div>
+          <div className="absolute bottom-10 right-10 w-16 h-16 bg-indigo-300/30 rounded-full blur-lg">          </div>
+        </div>
+        
+        {/* Image Indicators */}
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 flex space-x-2">
+          {backgroundImages.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentImageIndex(index)}
+              className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                index === currentImageIndex 
+                  ? 'bg-white shadow-lg scale-125' 
+                  : 'bg-white/50 hover:bg-white/70'
+              }`}
+              aria-label={`Go to image ${index + 1}`}
+            />
+          ))}
         </div>
       </section>
 
@@ -199,13 +271,67 @@ const Index = () => {
       </main>
 
       {/* Footer */}
-      <footer className="bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 text-white py-8 mt-20">
+      <footer className="bg-slate-900 text-white py-6 mt-20">
         <div className="container mx-auto px-4">
-          <div className="text-center">
-            <p className="text-blue-100 text-sm">
-              © 2024 Government of Punjab. All rights reserved. | 
-              <span className="text-white font-semibold ml-1">Punjab Transit Nexus</span>
-            </p>
+          <div className="grid md:grid-cols-3 gap-6 mb-6">
+            {/* Contact Information */}
+            <div className="text-center md:text-left">
+              <h3 className="text-xl font-bold mb-4 text-white">Contact Us</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-center md:justify-start gap-3">
+                  <Mail className="w-5 h-5 text-blue-300" />
+                  <span className="text-gray-300">transport@punjab.gov.in</span>
+                </div>
+                <div className="flex items-center justify-center md:justify-start gap-3">
+                  <Phone className="w-5 h-5 text-blue-300" />
+                  <span className="text-gray-300">+91-172-123-4567</span>
+                </div>
+                <div className="flex items-center justify-center md:justify-start gap-3">
+                  <Globe className="w-5 h-5 text-blue-300" />
+                  <span className="text-gray-300">www.punjabtransport.gov.in</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Links */}
+            <div className="text-center">
+              <h3 className="text-xl font-bold mb-4 text-white">Quick Links</h3>
+              <div className="space-y-2">
+                <div className="text-gray-300 hover:text-white transition-colors cursor-pointer">Customer Portal</div>
+                <div className="text-gray-300 hover:text-white transition-colors cursor-pointer">Driver Portal</div>
+                <div className="text-gray-300 hover:text-white transition-colors cursor-pointer">Municipality Portal</div>
+                <div className="text-gray-300 hover:text-white transition-colors cursor-pointer">Track Bus</div>
+              </div>
+            </div>
+
+            {/* Social Media */}
+            <div className="text-center md:text-right">
+              <h3 className="text-xl font-bold mb-4 text-white">Follow Us</h3>
+              <div className="flex justify-center md:justify-end gap-4">
+                <a href="#" className="w-10 h-10 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center transition-colors">
+                  <Twitter className="w-5 h-5 text-white" />
+                </a>
+                <a href="#" className="w-10 h-10 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center transition-colors">
+                  <Facebook className="w-5 h-5 text-white" />
+                </a>
+                <a href="#" className="w-10 h-10 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center transition-colors">
+                  <Instagram className="w-5 h-5 text-white" />
+                </a>
+                <a href="#" className="w-10 h-10 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center transition-colors">
+                  <Mail className="w-5 h-5 text-white" />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Copyright */}
+          <div className="border-t border-gray-700 pt-4">
+            <div className="text-center">
+              <p className="text-gray-300 text-sm">
+                © 2024 Government of Punjab. All rights reserved. | 
+                <span className="text-white font-semibold ml-1">Punjab Transport</span>
+              </p>
+            </div>
           </div>
         </div>
       </footer>

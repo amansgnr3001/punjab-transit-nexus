@@ -61,10 +61,44 @@ const CustomerPortal = () => {
               Back to Home
             </Button>
             
-            {/* Center - Customer Portal Title */}
-            <div className="text-center">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">Customer Portal</h1>
-              <p className="text-sm text-gray-600 font-medium">Plan Your Journey</p>
+            {/* Center - Government of Punjab */}
+            <div className="flex items-center gap-3">
+              {/* Punjab Government Official Logo */}
+              <div className="w-24 h-24 flex items-center justify-center">
+                <img 
+                  src="https://observenow.com/wp-content/uploads/2024/04/1706080895-6787-pb.png" 
+                  alt="Government of Punjab Logo" 
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    console.log('Logo failed to load, using fallback');
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+                {/* Fallback logo if image fails to load */}
+                <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center" style={{display: 'none'}}>
+                  <span className="text-white font-bold text-2xl">P</span>
+                </div>
+              </div>
+              <div className="text-center">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">PUNJAB TRANSPORT</h1>
+                <p className="text-sm text-gray-600 font-medium">Customer Portal</p>
+              </div>
+              {/* PUNBUS Logo */}
+              <div className="w-24 h-24 flex items-center justify-center">
+                <img 
+                  src="https://upload.wikimedia.org/wikipedia/commons/d/da/Logo_of_PUNBUS.svg" 
+                  alt="PUNBUS Logo" 
+                  className="w-full h-full object-contain rounded-xl shadow-lg border-2 border-blue-200"
+                  onError={(e) => {
+                    console.log('PUNBUS logo failed to load, using fallback');
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+                {/* Fallback icon if image fails to load */}
+                <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-cyan-100 rounded-xl flex items-center justify-center border-2 border-blue-200 shadow-lg" style={{display: 'none'}}>
+                  <MapPin className="w-12 h-12 text-blue-600" />
+                </div>
+              </div>
             </div>
             
             {/* Right Side - Spacer for balance */}
