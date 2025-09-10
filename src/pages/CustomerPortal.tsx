@@ -46,21 +46,29 @@ const CustomerPortal = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-indigo-100">
       {/* Header */}
-      <header className="border-b bg-white/95 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
+      <header className="bg-gradient-to-r from-white via-blue-50 to-cyan-50 backdrop-blur-md shadow-lg border-b border-blue-200">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
             <Button 
-              variant="ghost" 
-              size="sm" 
+              variant="outline" 
+              size="lg" 
               onClick={() => navigate('/')}
-              className="hover:bg-primary/10"
+              className="px-6 py-3"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
+              <ArrowLeft className="w-5 h-5 mr-2" />
               Back to Home
             </Button>
-            <h1 className="text-2xl font-bold text-primary">Customer Portal</h1>
+            
+            {/* Center - Customer Portal Title */}
+            <div className="text-center">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">Customer Portal</h1>
+              <p className="text-sm text-gray-600 font-medium">Plan Your Journey</p>
+            </div>
+            
+            {/* Right Side - Spacer for balance */}
+            <div className="w-32"></div>
           </div>
         </div>
       </header>
@@ -69,33 +77,33 @@ const CustomerPortal = () => {
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-foreground mb-2">
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent mb-2">
               Plan Your Journey
             </h2>
-            <p className="text-muted-foreground">
+            <p className="text-xl text-gray-600">
               Select your travel preferences to find the best bus routes
             </p>
           </div>
 
-          <Card className="shadow-lg border-2">
-            <CardHeader className="text-center">
-              <CardTitle className="flex items-center justify-center gap-2">
-                <Navigation className="w-5 h-5 text-primary" />
+          <Card className="shadow-2xl border-0 bg-gradient-to-br from-white to-blue-50 backdrop-blur-sm">
+            <CardHeader className="text-center pb-6 pt-8">
+              <CardTitle className="flex items-center justify-center gap-2 text-2xl font-bold text-gray-800">
+                <Navigation className="w-6 h-6 text-blue-600" />
                 Journey Planner
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-gray-600 text-base">
                 Choose your day and route preferences
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6 pb-8">
               {/* Day Selection */}
               <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-primary" />
+                <label className="text-sm font-medium flex items-center gap-2 text-gray-700">
+                  <Calendar className="w-4 h-4 text-blue-600" />
                   Day of the Week
                 </label>
                 <Select value={selectedDay} onValueChange={setSelectedDay}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full border-blue-200 focus:border-blue-400">
                     <SelectValue placeholder="Select a day" />
                   </SelectTrigger>
                   <SelectContent>
@@ -110,12 +118,12 @@ const CustomerPortal = () => {
 
               {/* Starting Point */}
               <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-secondary" />
+                <label className="text-sm font-medium flex items-center gap-2 text-gray-700">
+                  <MapPin className="w-4 h-4 text-cyan-600" />
                   Starting Point
                 </label>
                 <Select value={startingPoint} onValueChange={setStartingPoint} disabled={placesLoading}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full border-cyan-200 focus:border-cyan-400">
                     <SelectValue placeholder={placesLoading ? "Loading places..." : "Select starting location"} />
                   </SelectTrigger>
                   <SelectContent>
@@ -141,12 +149,12 @@ const CustomerPortal = () => {
 
               {/* Destination */}
               <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <Navigation className="w-4 h-4 text-government-green" />
+                <label className="text-sm font-medium flex items-center gap-2 text-gray-700">
+                  <Navigation className="w-4 h-4 text-indigo-600" />
                   Destination
                 </label>
                 <Select value={destination} onValueChange={setDestination} disabled={placesLoading}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full border-indigo-200 focus:border-indigo-400">
                     <SelectValue placeholder={placesLoading ? "Loading places..." : "Select destination"} />
                   </SelectTrigger>
                   <SelectContent>
@@ -172,7 +180,7 @@ const CustomerPortal = () => {
 
               {/* Search Button */}
               <Button 
-                className="w-full mt-6 bg-gradient-to-r from-primary to-primary-glow hover:from-primary-glow hover:to-primary"
+                className="w-full mt-6 bg-gradient-to-r from-blue-500 via-cyan-500 to-indigo-500 hover:from-blue-600 hover:via-cyan-600 hover:to-indigo-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                 disabled={!selectedDay || !startingPoint || !destination || searchLoading}
                 onClick={handleSearch}
               >
@@ -191,16 +199,16 @@ const CustomerPortal = () => {
 
               {/* Search Error */}
               {searchError && (
-                <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
                   {searchError}
                 </div>
               )}
 
               {/* Selection Summary */}
               {(selectedDay || startingPoint || destination) && (
-                <div className="mt-6 p-4 bg-accent/50 rounded-lg">
-                  <h3 className="font-medium mb-2">Your Selection:</h3>
-                  <div className="space-y-1 text-sm">
+                <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
+                  <h3 className="font-semibold mb-2 text-gray-800">Your Selection:</h3>
+                  <div className="space-y-1 text-sm text-gray-600">
                     {selectedDay && <p><strong>Day:</strong> {selectedDay}</p>}
                     {startingPoint && <p><strong>From:</strong> {startingPoint}</p>}
                     {destination && <p><strong>To:</strong> {destination}</p>}

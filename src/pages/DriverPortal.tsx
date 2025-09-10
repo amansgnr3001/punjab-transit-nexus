@@ -394,10 +394,10 @@ const DriverPortal = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/5 to-background">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-lime-100">
       {/* Header */}
-      <header className="border-b bg-white/95 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
+      <header className="bg-gradient-to-r from-white via-emerald-50 to-green-50 backdrop-blur-md shadow-lg border-b border-emerald-200">
+        <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <Button 
               variant="outline" 
@@ -413,59 +413,14 @@ const DriverPortal = () => {
             <div className="flex items-center gap-3">
               {/* Punjab Government Official Logo */}
               <div className="w-24 h-24 flex items-center justify-center">
-                <svg width="96" height="96" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
-                  {/* Outer Circle */}
-                  <circle cx="48" cy="48" r="45" fill="none" stroke="#000" strokeWidth="2"/>
-                  
-                  {/* Lion Capital - Main Lions */}
-                  <g transform="translate(48, 30) scale(1.2)">
-                    {/* Left Lion (profile) */}
-                    <path d="M-12,0 L-9,-3 L-6,0 L-9,3 Z" fill="#000"/>
-                    <circle cx="-9" cy="-1.5" r="1.5" fill="#000"/>
-                    
-                    {/* Center Lion (front facing) */}
-                    <path d="M-3,-3 L3,-3 L3,3 L-3,3 Z" fill="#000"/>
-                    <circle cx="0" cy="0" r="2" fill="#000"/>
-                    
-                    {/* Right Lion (profile) */}
-                    <path d="M6,0 L9,-3 L12,0 L9,3 Z" fill="#000"/>
-                    <circle cx="9" cy="-1.5" r="1.5" fill="#000"/>
-                  </g>
-                  
-                  {/* Abacus */}
-                  <rect x="24" y="42" width="48" height="12" fill="none" stroke="#000" strokeWidth="1.5"/>
-                  
-                  {/* Dharma Chakra (Wheel) */}
-                  <circle cx="48" cy="48" r="6" fill="none" stroke="#000" strokeWidth="1.5"/>
-                  <circle cx="48" cy="48" r="3" fill="#000"/>
-                  <line x1="48" y1="42" x2="48" y2="54" stroke="#000" strokeWidth="1"/>
-                  <line x1="42" y1="48" x2="54" y2="48" stroke="#000" strokeWidth="1"/>
-                  
-                  {/* Bull (right side) */}
-                  <g transform="translate(60, 48) scale(0.9)">
-                    <ellipse cx="0" cy="0" rx="4.5" ry="3" fill="#000"/>
-                    <path d="M-3,-1.5 L3,-1.5 L3,1.5 L-3,1.5 Z" fill="#000"/>
-                  </g>
-                  
-                  {/* Horse (left side) */}
-                  <g transform="translate(36, 48) scale(0.9)">
-                    <ellipse cx="0" cy="0" rx="4.5" ry="3" fill="#000"/>
-                    <path d="M-3,-1.5 L3,-1.5 L3,1.5 L-3,1.5 Z" fill="#000"/>
-                  </g>
-                  
-                  {/* Motto - सत्यमेव जयते */}
-                  <text x="48" y="72" textAnchor="middle" fontSize="6" fill="#000" fontFamily="serif" fontWeight="bold">
-                    सत्यमेव जयते
-                  </text>
-                  
-                  {/* GOVT. PUNJAB Text */}
-                  <text x="48" y="84" textAnchor="middle" fontSize="5" fill="#000" fontFamily="sans-serif" fontWeight="bold">
-                    GOVT. PUNJAB
-                  </text>
-                </svg>
+                <img 
+                  src="https://observenow.com/wp-content/uploads/2024/04/1706080895-6787-pb.png" 
+                  alt="Government of Punjab Logo" 
+                  className="w-full h-full object-contain"
+                />
               </div>
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-gray-800">GOVERNMENT OF PUNJAB</h1>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 via-green-600 to-lime-600 bg-clip-text text-transparent">GOVERNMENT OF PUNJAB</h1>
                 <p className="text-sm text-gray-600 font-medium">Driver Portal</p>
               </div>
             </div>
@@ -488,49 +443,50 @@ const DriverPortal = () => {
           <div className="max-w-md mx-auto">
             {!showRegister ? (
               // Login Form
-              <Card className="shadow-lg border-2">
-                <CardHeader className="text-center">
-                  <CardTitle className="flex items-center justify-center gap-2">
-                    <LogIn className="w-5 h-5 text-secondary" />
+              <Card className="shadow-2xl border-0 bg-gradient-to-br from-white to-emerald-50 backdrop-blur-sm">
+                <CardHeader className="text-center pb-6 pt-8">
+                  <CardTitle className="flex items-center justify-center gap-2 text-2xl font-bold text-gray-800">
+                    <LogIn className="w-6 h-6 text-emerald-600" />
                     Driver Login
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-gray-600 text-base">
                     Please login to access your dashboard
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pb-8">
                   {error && (
-                    <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                    <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
                       {error}
                     </div>
                   )}
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="contactNumber">Contact Number</Label>
+                      <Label htmlFor="contactNumber" className="text-gray-700 font-medium">Contact Number</Label>
                       <Input
                         id="contactNumber"
                         type="text"
                         placeholder="Enter your contact number"
                         value={loginForm.contactNumber}
                         onChange={(e) => setLoginForm(prev => ({ ...prev, contactNumber: e.target.value }))}
+                        className="border-emerald-200 focus:border-emerald-400"
                         required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="password">Password</Label>
+                      <Label htmlFor="password" className="text-gray-700 font-medium">Password</Label>
                       <Input
                         id="password"
                         type="password"
                         placeholder="Enter your password"
                         value={loginForm.password}
                         onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
+                        className="border-emerald-200 focus:border-emerald-400"
                         required
                       />
                     </div>
                     <Button 
                       type="submit" 
-                      className="w-full" 
-                      variant="secondary"
+                      className="w-full bg-gradient-to-r from-emerald-500 via-green-500 to-lime-500 hover:from-emerald-600 hover:via-green-600 hover:to-lime-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                       disabled={loading}
                     >
                       {loading ? 'Logging in...' : 'Login to Dashboard'}
@@ -541,7 +497,7 @@ const DriverPortal = () => {
                       type="button"
                       variant="link"
                       onClick={() => setShowRegister(true)}
-                      className="text-secondary hover:text-secondary/80"
+                      className="text-emerald-600 hover:text-emerald-700"
                     >
                       <UserPlus className="w-4 h-4 mr-2" />
                       Don't have an account? Register here
@@ -551,71 +507,74 @@ const DriverPortal = () => {
               </Card>
             ) : (
               // Register Form
-              <Card className="shadow-lg border-2">
-                <CardHeader className="text-center">
-                  <CardTitle className="flex items-center justify-center gap-2">
-                    <UserPlus className="w-5 h-5 text-secondary" />
+              <Card className="shadow-2xl border-0 bg-gradient-to-br from-white to-emerald-50 backdrop-blur-sm">
+                <CardHeader className="text-center pb-6 pt-8">
+                  <CardTitle className="flex items-center justify-center gap-2 text-2xl font-bold text-gray-800">
+                    <UserPlus className="w-6 h-6 text-emerald-600" />
                     Driver Registration
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-gray-600 text-base">
                     Create your driver account
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pb-8">
                   {error && (
-                    <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                    <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
                       {error}
                     </div>
                   )}
                   <form onSubmit={handleRegister} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="regName">Full Name</Label>
+                      <Label htmlFor="regName" className="text-gray-700 font-medium">Full Name</Label>
                       <Input
                         id="regName"
                         type="text"
                         placeholder="Enter your full name"
                         value={registerForm.name}
                         onChange={(e) => setRegisterForm(prev => ({ ...prev, name: e.target.value }))}
+                        className="border-emerald-200 focus:border-emerald-400"
                         required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="regAge">Age</Label>
+                      <Label htmlFor="regAge" className="text-gray-700 font-medium">Age</Label>
                       <Input
                         id="regAge"
                         type="number"
                         placeholder="Enter your age"
                         value={registerForm.age}
                         onChange={(e) => setRegisterForm(prev => ({ ...prev, age: e.target.value }))}
+                        className="border-emerald-200 focus:border-emerald-400"
                         required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="regContactNumber">Contact Number</Label>
+                      <Label htmlFor="regContactNumber" className="text-gray-700 font-medium">Contact Number</Label>
                       <Input
                         id="regContactNumber"
                         type="text"
                         placeholder="Enter your contact number"
                         value={registerForm.contactNumber}
                         onChange={(e) => setRegisterForm(prev => ({ ...prev, contactNumber: e.target.value }))}
+                        className="border-emerald-200 focus:border-emerald-400"
                         required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="regPassword">Password</Label>
+                      <Label htmlFor="regPassword" className="text-gray-700 font-medium">Password</Label>
                       <Input
                         id="regPassword"
                         type="password"
                         placeholder="Create a password"
                         value={registerForm.password}
                         onChange={(e) => setRegisterForm(prev => ({ ...prev, password: e.target.value }))}
+                        className="border-emerald-200 focus:border-emerald-400"
                         required
                       />
                     </div>
                     <Button 
                       type="submit" 
-                      className="w-full" 
-                      variant="secondary"
+                      className="w-full bg-gradient-to-r from-emerald-500 via-green-500 to-lime-500 hover:from-emerald-600 hover:via-green-600 hover:to-lime-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                       disabled={loading}
                     >
                       {loading ? 'Creating Account...' : 'Create Account'}
@@ -626,7 +585,7 @@ const DriverPortal = () => {
                       type="button"
                       variant="link"
                       onClick={() => setShowRegister(false)}
-                      className="text-secondary hover:text-secondary/80"
+                      className="text-emerald-600 hover:text-emerald-700"
                     >
                       Already have an account? Login here
                     </Button>

@@ -11,6 +11,7 @@ const app = express();
 
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/realtime-bus-tracking';
+console.log('🔍 DEBUG: MongoDB URI:', MONGO_URI);
 
 // Models (direct imports)
 const Bus = require('../models/Bus');
@@ -223,6 +224,38 @@ app.post('/api/municipality/buses', wrap(async (req, res) => {
 }));
 
 // Get all buses
+
+// Analytics: Get bus location count
+app.get('/api/municipality/bus-location-count', wrap(async (req, res) => {
+	try {
+		// Initialize map data structure
+		const locationCountMap = new Map();
+		
+		// Retrieve all data from Bus table
+		const buses = await Bus.find({});
+		
+		// Iterate through all buses
+		buses.forEach(bus => {
+			// Iterate through all schedules
+			bus.schedules.forEach(schedule => {
+				// Increment starting place
+				locationCountMap.set(schedule.startingPlace, (locationCountMap.get(schedule.startingPlace) || 0) + 1);
+				
+				// Increment destination  
+				locationCountMap.set(schedule.destination, (locationCountMap.get(schedule.destination) || 0) + 1);
+				
+				// Increment all middle stops
+				schedule.stops.forEach(stop => {
+					locationCountMap.set(stop.name, (locationCountMap.get(stop.name) || 0) + 1);
+				});
+			});
+		});
+		res.json(Object.fromEntries(locationCountMap));
+	} catch (error) {
+		console.error('Error getting bus location count:', error);
+		res.status(500).json({ error: 'Failed to get bus location count' });
+	}
+}));
 
 // Start server
 app.listen(PORT, () => {
