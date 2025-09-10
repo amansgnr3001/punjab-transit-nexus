@@ -14,7 +14,6 @@ const MunicipalityPortal = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [activeSection, setActiveSection] = useState("dashboard");
-  const [showAddBusForm, setShowAddBusForm] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<{[key: string]: number}>({});
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   const [busForm, setBusForm] = useState({
@@ -76,7 +75,7 @@ const MunicipalityPortal = () => {
   }, [activeSection, isLoggedIn]);
 
   const handleAddBus = () => {
-    setShowAddBusForm(true);
+    setActiveSection("addBus");
   };
 
   const handleBusFormChange = (field: string, value: any, scheduleIndex?: number, stopIndex?: number, dayIndex?: number) => {
@@ -150,7 +149,25 @@ const MunicipalityPortal = () => {
     setBusForm(prev => ({ ...prev, schedules: newSchedules }));
   };
 
-  const handleSubmitBus = async (e: React.FormEvent) => {
+  const updateSchedule = (scheduleIndex: number, field: string, value: string) => {
+    const newSchedules = [...busForm.schedules];
+    newSchedules[scheduleIndex] = { ...newSchedules[scheduleIndex], [field]: value };
+    setBusForm(prev => ({ ...prev, schedules: newSchedules }));
+  };
+
+  const updateStop = (scheduleIndex: number, stopIndex: number, value: string) => {
+    const newSchedules = [...busForm.schedules];
+    newSchedules[scheduleIndex].stops[stopIndex] = { ...newSchedules[scheduleIndex].stops[stopIndex], name: value };
+    setBusForm(prev => ({ ...prev, schedules: newSchedules }));
+  };
+
+  const updateDay = (scheduleIndex: number, dayIndex: number, value: string) => {
+    const newSchedules = [...busForm.schedules];
+    newSchedules[scheduleIndex].days[dayIndex] = value;
+    setBusForm(prev => ({ ...prev, schedules: newSchedules }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Prepare data for submission - set lat, long, time as 0 for each stop
@@ -186,7 +203,6 @@ const MunicipalityPortal = () => {
 
       if (response.ok) {
         console.log('Bus added successfully');
-        setShowAddBusForm(false);
         setBusForm({
           Bus_number_plate: "",
           busName: "",
@@ -207,6 +223,7 @@ const MunicipalityPortal = () => {
             days: [""]
           }]
         });
+        setActiveSection("bus");
       } else {
         console.error('Failed to add bus');
       }
@@ -215,8 +232,10 @@ const MunicipalityPortal = () => {
     }
   };
 
+
   const sidebarItems = [
     { id: "bus", title: "Bus", icon: Bus },
+    { id: "addBus", title: "Add Bus", icon: Plus },
     { id: "route", title: "Route", icon: Route },
     { id: "addRoute", title: "Add Route", icon: Plus },
     { id: "schedule", title: "Schedule", icon: Calendar },
@@ -228,212 +247,10 @@ const MunicipalityPortal = () => {
       case "bus":
         return (
           <div>
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h3 className="text-2xl font-bold mb-2">Bus Management</h3>
-                <p className="text-muted-foreground">Manage bus fleet and vehicle information.</p>
-              </div>
-              <Button 
-                onClick={handleAddBus}
-                style={{ backgroundColor: 'hsl(var(--government-green))', color: 'white' }}
-                className="hover:opacity-90"
-              >
-                Add Bus
-              </Button>
+            <div className="mb-6">
+              <h3 className="text-2xl font-bold mb-2">Bus Management</h3>
+              <p className="text-muted-foreground">Manage bus fleet and vehicle information.</p>
             </div>
-
-            {showAddBusForm && (
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle>Add New Bus</CardTitle>
-                  <CardDescription>Fill in the bus information and schedules</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmitBus} className="space-y-6">
-                    {/* Basic Bus Information */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="busNumberPlate">Bus Number Plate</Label>
-                        <Input
-                          id="busNumberPlate"
-                          value={busForm.Bus_number_plate}
-                          onChange={(e) => handleBusFormChange('Bus_number_plate', e.target.value)}
-                          placeholder="e.g., PB-01-A-1234"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="busName">Bus Name</Label>
-                        <Input
-                          id="busName"
-                          value={busForm.busName}
-                          onChange={(e) => handleBusFormChange('busName', e.target.value)}
-                          placeholder="e.g., Express Bus 1"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Schedules */}
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h4 className="text-lg font-semibold">Schedules</h4>
-                        <Button type="button" onClick={addSchedule} variant="outline" size="sm">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Schedule
-                        </Button>
-                      </div>
-
-                      {busForm.schedules.map((schedule, scheduleIndex) => (
-                        <Card key={scheduleIndex} className="p-4">
-                          <div className="flex justify-between items-center mb-4">
-                            <h5 className="font-medium">Schedule {scheduleIndex + 1}</h5>
-                            {busForm.schedules.length > 1 && (
-                              <Button
-                                type="button"
-                                onClick={() => removeSchedule(scheduleIndex)}
-                                variant="outline"
-                                size="sm"
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div className="space-y-2">
-                              <Label>Start Time</Label>
-                              <Input
-                                type="time"
-                                value={schedule.starttime}
-                                onChange={(e) => handleBusFormChange('starttime', e.target.value, scheduleIndex)}
-                                required
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>End Time</Label>
-                              <Input
-                                type="time"
-                                value={schedule.endtime}
-                                onChange={(e) => handleBusFormChange('endtime', e.target.value, scheduleIndex)}
-                                required
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Starting Place</Label>
-                              <Input
-                                value={schedule.startingPlace}
-                                onChange={(e) => handleBusFormChange('startingPlace', e.target.value, scheduleIndex)}
-                                placeholder="e.g., Amritsar"
-                                required
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Destination</Label>
-                              <Input
-                                value={schedule.destination}
-                                onChange={(e) => handleBusFormChange('destination', e.target.value, scheduleIndex)}
-                                placeholder="e.g., Ludhiana"
-                                required
-                              />
-                            </div>
-                          </div>
-
-                          {/* Stops */}
-                          <div className="space-y-2 mb-4">
-                            <div className="flex justify-between items-center">
-                              <Label>Stops</Label>
-                              <Button
-                                type="button"
-                                onClick={() => addStop(scheduleIndex)}
-                                variant="outline"
-                                size="sm"
-                              >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Add Stop
-                              </Button>
-                            </div>
-                            {schedule.stops.map((stop, stopIndex) => (
-                              <div key={stopIndex} className="flex gap-2">
-                                <Input
-                                  value={stop.name}
-                                  onChange={(e) => handleBusFormChange('name', e.target.value, scheduleIndex, stopIndex)}
-                                  placeholder="Stop name"
-                                  required
-                                />
-                                {schedule.stops.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    onClick={() => removeStop(scheduleIndex, stopIndex)}
-                                    variant="outline"
-                                    size="sm"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Days */}
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <Label>Operating Days</Label>
-                              <Button
-                                type="button"
-                                onClick={() => addDay(scheduleIndex)}
-                                variant="outline"
-                                size="sm"
-                              >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Add Day
-                              </Button>
-                            </div>
-                            {schedule.days.map((day, dayIndex) => (
-                              <div key={dayIndex} className="flex gap-2">
-                                <Input
-                                  value={day}
-                                  onChange={(e) => handleBusFormChange('days', e.target.value, scheduleIndex, undefined, dayIndex)}
-                                  placeholder="e.g., Monday"
-                                  required
-                                />
-                                {schedule.days.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    onClick={() => removeDay(scheduleIndex, dayIndex)}
-                                    variant="outline"
-                                    size="sm"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-
-                    {/* Form Actions */}
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setShowAddBusForm(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        style={{ backgroundColor: 'hsl(var(--government-green))', color: 'white' }}
-                      >
-                        Submit
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            )}
           </div>
         );
       case "route":
@@ -462,6 +279,193 @@ const MunicipalityPortal = () => {
           <div>
             <h3 className="text-2xl font-bold mb-4">Schedule Management</h3>
             <p className="text-muted-foreground">Set up and modify bus schedules and timetables.</p>
+          </div>
+        );
+      case "addBus":
+        return (
+          <div>
+            <div className="mb-6">
+              <h3 className="text-2xl font-bold mb-2">Add New Bus</h3>
+              <p className="text-muted-foreground">Fill in the bus information and schedules to add a new bus to the fleet.</p>
+            </div>
+
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Add New Bus</CardTitle>
+                <CardDescription>Fill in the bus information and schedules</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="busNumberPlate">Bus Number Plate</Label>
+                      <Input
+                        id="busNumberPlate"
+                        value={busForm.Bus_number_plate}
+                        onChange={(e) => setBusForm(prev => ({ ...prev, Bus_number_plate: e.target.value }))}
+                        placeholder="e.g., PB-01-AB-1234"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="busName">Bus Name</Label>
+                      <Input
+                        id="busName"
+                        value={busForm.busName}
+                        onChange={(e) => setBusForm(prev => ({ ...prev, busName: e.target.value }))}
+                        placeholder="e.g., City Express"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-lg font-semibold">Schedules</h4>
+                      <Button type="button" onClick={addSchedule} variant="outline" size="sm">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Schedule
+                      </Button>
+                    </div>
+
+                    {busForm.schedules.map((schedule, scheduleIndex) => (
+                      <Card key={scheduleIndex} className="mb-4 p-4">
+                        <div className="flex justify-between items-center mb-4">
+                          <h5 className="font-medium">Schedule {scheduleIndex + 1}</h5>
+                          {busForm.schedules.length > 1 && (
+                            <Button
+                              type="button"
+                              onClick={() => removeSchedule(scheduleIndex)}
+                              variant="outline"
+                              size="sm"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <Label htmlFor={`startTime-${scheduleIndex}`}>Start Time</Label>
+                            <Input
+                              id={`startTime-${scheduleIndex}`}
+                              type="time"
+                              value={schedule.starttime}
+                              onChange={(e) => updateSchedule(scheduleIndex, 'starttime', e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`endTime-${scheduleIndex}`}>End Time</Label>
+                            <Input
+                              id={`endTime-${scheduleIndex}`}
+                              type="time"
+                              value={schedule.endtime}
+                              onChange={(e) => updateSchedule(scheduleIndex, 'endtime', e.target.value)}
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <Label htmlFor={`startingPlace-${scheduleIndex}`}>Starting Place</Label>
+                            <Input
+                              id={`startingPlace-${scheduleIndex}`}
+                              value={schedule.startingPlace}
+                              onChange={(e) => updateSchedule(scheduleIndex, 'startingPlace', e.target.value)}
+                              placeholder="e.g., Chandigarh"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`destination-${scheduleIndex}`}>Destination</Label>
+                            <Input
+                              id={`destination-${scheduleIndex}`}
+                              value={schedule.destination}
+                              onChange={(e) => updateSchedule(scheduleIndex, 'destination', e.target.value)}
+                              placeholder="e.g., Amritsar"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mb-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <Label>Stops</Label>
+                            <Button type="button" onClick={() => addStop(scheduleIndex)} variant="outline" size="sm">
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add Stop
+                            </Button>
+                          </div>
+                          {schedule.stops.map((stop, stopIndex) => (
+                            <div key={stopIndex} className="flex gap-2 mb-2">
+                              <Input
+                                value={stop.name}
+                                onChange={(e) => updateStop(scheduleIndex, stopIndex, e.target.value)}
+                                placeholder="Stop name"
+                                required
+                              />
+                              {schedule.stops.length > 1 && (
+                                <Button
+                                  type="button"
+                                  onClick={() => removeStop(scheduleIndex, stopIndex)}
+                                  variant="outline"
+                                  size="sm"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <Label>Days of Operation</Label>
+                            <Button type="button" onClick={() => addDay(scheduleIndex)} variant="outline" size="sm">
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add Day
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {schedule.days.map((day, dayIndex) => (
+                              <div key={dayIndex} className="flex gap-2">
+                                <Input
+                                  value={day}
+                                  onChange={(e) => updateDay(scheduleIndex, dayIndex, e.target.value)}
+                                  placeholder="e.g., Monday"
+                                  required
+                                />
+                                {schedule.days.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    onClick={() => removeDay(scheduleIndex, dayIndex)}
+                                    variant="outline"
+                                    size="sm"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+
+                    <div className="flex gap-4">
+                      <Button type="submit" style={{ backgroundColor: 'hsl(var(--government-green))', color: 'white' }}>
+                        Add Bus
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => setActiveSection("bus")}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
           </div>
         );
       case "analytics":

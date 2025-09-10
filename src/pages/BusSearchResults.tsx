@@ -255,18 +255,45 @@ const BusSearchResults = () => {
                             : 'bg-green-600 hover:bg-green-700'
                         }`}
                         disabled={busStatuses[bus.Bus_number_plate] === 'reached'}
-                        onClick={() => {
+                        onClick={async () => {
                           if (busStatuses[bus.Bus_number_plate] !== 'reached') {
-                            // Store bus details in localStorage for the tracking page
-                            localStorage.setItem(`busDetails_${bus.Bus_number_plate}`, JSON.stringify({
-                              busName: bus.busName,
-                              busNumberPlate: bus.Bus_number_plate,
-                              startingPlace: bus.schedule.startingPlace,
-                              destination: bus.schedule.destination
-                            }));
-                            
-                            // Navigate to the tracking page
-                            navigate(`/track-bus/${bus.Bus_number_plate}`);
+                            try {
+                              // First fetch the detailed schedule
+                              // Note: We need to get the schedule ID from the bus data
+                              console.log('🚌 Bus data:', bus);
+                              console.log('📅 Schedule data:', bus.schedule);
+                              
+                              // For now, let's use a placeholder schedule ID or skip the API call
+                              // and use the schedule data we already have
+                              const scheduleData = {
+                                success: true,
+                                schedule: bus.schedule
+                              };
+                              
+                              console.log('📅 Using existing schedule data:', scheduleData.schedule);
+                              
+                              // Store bus details and schedule in localStorage for the tracking page
+                              localStorage.setItem(`busDetails_${bus.Bus_number_plate}`, JSON.stringify({
+                                busName: bus.busName,
+                                busNumberPlate: bus.Bus_number_plate,
+                                startingPlace: bus.schedule.startingPlace,
+                                destination: bus.schedule.destination,
+                                schedule: scheduleData.schedule // Store the schedule data
+                              }));
+                              
+                              // Navigate to the tracking page
+                              navigate(`/track-bus/${bus.Bus_number_plate}`);
+                            } catch (error) {
+                              console.error('Error processing schedule:', error);
+                              // Fallback to basic tracking
+                              localStorage.setItem(`busDetails_${bus.Bus_number_plate}`, JSON.stringify({
+                                busName: bus.busName,
+                                busNumberPlate: bus.Bus_number_plate,
+                                startingPlace: bus.schedule.startingPlace,
+                                destination: bus.schedule.destination
+                              }));
+                              navigate(`/track-bus/${bus.Bus_number_plate}`);
+                            }
                           }
                         }}
                       >

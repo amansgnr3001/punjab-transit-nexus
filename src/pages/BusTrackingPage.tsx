@@ -15,11 +15,34 @@ const BusTrackingPage: React.FC = () => {
     busNumberPlate: string;
     startingPlace: string;
     destination: string;
+    schedule?: {
+      _id: string;
+      starttime: string;
+      endtime: string;
+      startingPlace: string;
+      destination: string;
+      stops: Array<{
+        name: string;
+        lat: number;
+        long: number;
+        time: number;
+      }>;
+      days: string[];
+      startLocation: {
+        lat: number;
+        long: number;
+      };
+      destinationLocation: {
+        lat: number;
+        long: number;
+      };
+    };
   } | null>(null);
 
   const {
     isTracking,
     markers,
+    scheduledMarkers,
     polyline,
     currentLocation,
     busStatus,
@@ -32,11 +55,12 @@ const BusTrackingPage: React.FC = () => {
       // Extract bus details from localStorage or API
       const storedBusDetails = localStorage.getItem(`busDetails_${busNumberPlate}`);
       if (storedBusDetails) {
-        setBusDetails(JSON.parse(storedBusDetails));
+        const parsedDetails = JSON.parse(storedBusDetails);
+        setBusDetails(parsedDetails);
+        
+        // Start tracking with schedule if available
+        startTracking(busNumberPlate, parsedDetails.schedule);
       }
-      
-      // Start tracking
-      startTracking(busNumberPlate);
     }
 
     return () => {
@@ -68,6 +92,50 @@ const BusTrackingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-300">
+      {/* Add custom styles for marker labels */}
+      <style>{`
+        .marker-label-scheduled {
+          transform: translate(-50%, -120%) !important;
+          background: rgba(255, 255, 255, 0.9) !important;
+          padding: 4px 8px !important;
+          border-radius: 4px !important;
+          border: 2px solid #16a34a !important;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+          white-space: nowrap !important;
+          font-size: 12px !important;
+          font-weight: bold !important;
+          color: #000000 !important;
+        }
+        .marker-label-realtime {
+          transform: translate(-50%, 20%) !important;
+          background: rgba(255, 255, 255, 0.9) !important;
+          padding: 4px 8px !important;
+          border-radius: 4px !important;
+          border: 2px solid #2563eb !important;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+          white-space: nowrap !important;
+          font-size: 12px !important;
+          font-weight: bold !important;
+          color: #000000 !important;
+        }
+        .marker-label-combined {
+          transform: translate(-50%, -50%) !important;
+          background: #ffffff !important;
+          color: #000000 !important;
+          padding: 8px 12px !important;
+          border-radius: 8px !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+          white-space: nowrap !important;
+          font-size: 13px !important;
+          font-weight: bold !important;
+          text-align: center !important;
+          min-width: 120px !important;
+          max-width: 300px !important;
+          width: fit-content !important;
+          border: 2px solid #000000 !important;
+        }
+      `}</style>
+      
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -114,12 +182,13 @@ const BusTrackingPage: React.FC = () => {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="relative">
-                <BusTrackingMap
-                  markers={markers}
-                  polyline={polyline}
-                  currentLocation={currentLocation}
-                  isTracking={isTracking}
-                />
+            <BusTrackingMap
+              markers={markers}
+              scheduledMarkers={scheduledMarkers}
+              polyline={polyline}
+              currentLocation={currentLocation}
+              isTracking={isTracking}
+            />
                 {isTracking && (
                   <div className="absolute top-4 left-4">
                     <Badge className="bg-green-500 text-white flex items-center space-x-1">
@@ -128,6 +197,28 @@ const BusTrackingPage: React.FC = () => {
                     </Badge>
                   </div>
                 )}
+                
+                {/* Map Legend */}
+                <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-3 text-sm">
+                  <div className="font-semibold text-gray-800 mb-2">Map Legend</div>
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"></div>
+                      <span className="text-gray-700">Combined ETAs</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                      <span className="text-gray-700">Start/End Points</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 bg-black rounded-full"></div>
+                      <span className="text-gray-700">Current Bus</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-2">
+                      🟢 = Estimated ETA | 🔴 = Real-time ETA
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

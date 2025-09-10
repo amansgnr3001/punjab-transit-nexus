@@ -59,8 +59,25 @@ interface UseBusTrackingReturn {
     position: { lat: number; lng: number };
     label: string;
     title: string;
+    type?: 'scheduled' | 'realtime' | 'current';
   }>;
-  startTracking: (busNumberPlate: string) => void;
+  scheduledMarkers: Array<{
+    position: { lat: number; lng: number };
+    label: string | {
+      text: string;
+      color: string;
+      fontSize: string;
+      fontWeight: string;
+      className?: string;
+    };
+    title: string;
+    icon?: {
+      url: string;
+      scaledSize: any;
+      anchor: any;
+    };
+  }>;
+  startTracking: (busNumberPlate: string, schedule?: any) => void;
   stopTracking: () => void;
   error: string | null;
   busStatus: 'active' | 'reached' | 'unknown';
@@ -75,6 +92,23 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     position: { lat: number; lng: number };
     label: string;
     title: string;
+    type?: 'scheduled' | 'realtime' | 'current';
+  }>>([]);
+  const [scheduledMarkers, setScheduledMarkers] = useState<Array<{
+    position: { lat: number; lng: number };
+    label: string | {
+      text: string;
+      color: string;
+      fontSize: string;
+      fontWeight: string;
+      className?: string;
+    };
+    title: string;
+    icon?: {
+      url: string;
+      scaledSize: any;
+      anchor: any;
+    };
   }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [busStatus, setBusStatus] = useState<'active' | 'reached' | 'unknown'>('unknown');
@@ -86,26 +120,323 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  const createMarkers = React.useCallback((activeBusDoc: ActiveBusDoc) => {
+  // Helper functions for localStorage persistence
+  const saveMarkerDataToStorage = (activeBusDoc: ActiveBusDoc, polylineData: string, markersData: any[], currentLoc: any) => {
+    try {
+      const markerData = {
+        activeBus: activeBusDoc,
+        polyline: polylineData,
+        timestamp: Date.now(),
+        markers: markersData,
+        currentLocation: currentLoc
+      };
+      localStorage.setItem('busTrackingData', JSON.stringify(markerData));
+      console.log('💾 Saved marker data to localStorage');
+    } catch (error) {
+      console.error('❌ Error saving to localStorage:', error);
+    }
+  };
+
+  const restoreMarkerDataFromStorage = () => {
+    try {
+      const storedData = localStorage.getItem('busTrackingData');
+      console.log('🔍 Checking localStorage for stored data:', storedData ? 'Found' : 'Not found');
+      
+      if (storedData) {
+        const markerData = JSON.parse(storedData);
+        console.log('🔄 Restoring marker data from localStorage:', markerData);
+        console.log('🔄 Markers count:', markerData.markers?.length || 0);
+        console.log('🔄 Active bus:', markerData.activeBus);
+        
+        // Check if data is not too old (e.g., less than 5 minutes)
+        const dataAge = Date.now() - markerData.timestamp;
+        console.log('🔄 Data age (minutes):', Math.round(dataAge / (1000 * 60)));
+        
+        if (dataAge < 5 * 60 * 1000) { // 5 minutes
+          setActiveBus(markerData.activeBus);
+          setPolyline(markerData.polyline);
+          setMarkers(markerData.markers || []);
+          setCurrentLocation(markerData.currentLocation);
+          console.log('✅ Restored marker data from localStorage');
+          return true;
+        } else {
+          console.log('⏰ Stored data is too old, clearing localStorage');
+          localStorage.removeItem('busTrackingData');
+        }
+      } else {
+        console.log('❌ No stored data found in localStorage');
+      }
+    } catch (error) {
+      console.error('❌ Error restoring from localStorage:', error);
+      localStorage.removeItem('busTrackingData');
+    }
+    return false;
+  };
+
+  const clearMarkerDataFromStorage = () => {
+    try {
+      localStorage.removeItem('busTrackingData');
+      console.log('🗑️ Cleared marker data from localStorage');
+    } catch (error) {
+      console.error('❌ Error clearing localStorage:', error);
+    }
+  };
+
+  const createScheduledMarkers = React.useCallback((schedule: any) => {
+    console.log('📅 Creating scheduled markers for schedule:', schedule);
+    console.log('📅 Schedule type:', typeof schedule);
+    console.log('📅 Schedule keys:', schedule ? Object.keys(schedule) : 'No schedule');
+    console.log('📅 Schedule startLocation:', schedule?.startLocation);
+    console.log('📅 Schedule destinationLocation:', schedule?.destinationLocation);
+    console.log('📅 Schedule stops:', schedule?.stops);
+    
+    const newScheduledMarkers = [];
+    
+    // Offset distance in degrees (approximately 200-300 meters for clear separation)
+    const OFFSET_DISTANCE = 0.002; // ~200 meters - much larger for clear separation
+    
+    // Function to calculate perpendicular offset for road-side placement
+    const getPerpendicularOffset = (lat: number, lng: number, isScheduled: boolean) => {
+      // For scheduled markers, offset to one side of the road
+      // For real-time markers, offset to the other side of the road
+      const sideMultiplier = isScheduled ? 1 : -1;
+      return {
+        lat: lat + (OFFSET_DISTANCE * sideMultiplier),
+        lng: lng + (OFFSET_DISTANCE * sideMultiplier * 0.8) // Larger lng offset for better visual separation
+      };
+    };
+    
+    // Add starting place marker (GREEN for scheduled)
+    // Check if we have location data, otherwise use stops data
+    if (schedule.startLocation && schedule.startLocation.lat && schedule.startLocation.long) {
+      console.log('📅 Using startLocation for starting place marker');
+      console.log('📅 Start location data:', schedule.startLocation);
+      const startingPlaceOffset = getPerpendicularOffset(schedule.startLocation.lat, schedule.startLocation.long, true);
+      const startingPlaceMarker = {
+        position: startingPlaceOffset,
+        label: {
+          text: `${schedule.startingPlace}\n${schedule.starttime}`,
+          color: '#000000',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          className: 'marker-label-scheduled'
+        },
+        title: `${schedule.startingPlace} - Scheduled Start: ${schedule.starttime}`,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#16a34a"/>
+              <circle cx="12" cy="9" r="3" fill="#ffffff"/>
+            </svg>
+          `),
+          scaledSize: { width: 28, height: 28 },
+          anchor: { x: 14, y: 14 }
+        }
+      };
+      newScheduledMarkers.push(startingPlaceMarker);
+      console.log('✅ Added starting place marker:', startingPlaceMarker);
+    } else if (schedule.stops && schedule.stops.length > 0) {
+      console.log('📅 Using first stop for starting place marker');
+      const firstStop = schedule.stops[0];
+      console.log('📅 First stop data:', firstStop);
+      const startingPlaceOffset = getPerpendicularOffset(firstStop.lat, firstStop.long, true);
+      const startingPlaceMarker = {
+        position: startingPlaceOffset,
+        label: {
+          text: `${schedule.startingPlace}\n${schedule.starttime}`,
+          color: '#000000',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          className: 'marker-label-scheduled'
+        },
+        title: `${schedule.startingPlace} - Scheduled Start: ${schedule.starttime}`,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#16a34a"/>
+              <circle cx="12" cy="9" r="3" fill="#ffffff"/>
+            </svg>
+          `),
+          scaledSize: { width: 28, height: 28 },
+          anchor: { x: 14, y: 14 }
+        }
+      };
+      newScheduledMarkers.push(startingPlaceMarker);
+      console.log('✅ Added starting place marker from first stop:', startingPlaceMarker);
+    } else {
+      console.log('❌ No location data available for starting place');
+    }
+    
+    // Add destination marker (GREEN for scheduled)
+    if (schedule.destinationLocation && schedule.destinationLocation.lat && schedule.destinationLocation.long) {
+      console.log('📅 Using destinationLocation for destination marker');
+      const destinationOffset = getPerpendicularOffset(schedule.destinationLocation.lat, schedule.destinationLocation.long, true);
+      const destinationMarker = {
+        position: destinationOffset,
+        label: {
+          text: `${schedule.destination}\n${schedule.endtime}`,
+          color: '#000000',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          className: 'marker-label-scheduled'
+        },
+        title: `${schedule.destination} - Scheduled Arrival: ${schedule.endtime}`,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#16a34a"/>
+              <circle cx="12" cy="9" r="3" fill="#ffffff"/>
+            </svg>
+          `),
+          scaledSize: { width: 28, height: 28 },
+          anchor: { x: 14, y: 14 }
+        }
+      };
+      newScheduledMarkers.push(destinationMarker);
+    } else if (schedule.stops && schedule.stops.length > 0) {
+      console.log('📅 Using last stop for destination marker');
+      const lastStop = schedule.stops[schedule.stops.length - 1];
+      const destinationOffset = getPerpendicularOffset(lastStop.lat, lastStop.long, true);
+      const destinationMarker = {
+        position: destinationOffset,
+        label: {
+          text: `${schedule.destination}\n${schedule.endtime}`,
+          color: '#000000',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          className: 'marker-label-scheduled'
+        },
+        title: `${schedule.destination} - Scheduled Arrival: ${schedule.endtime}`,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="28" height="28" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#16a34a"/>
+              <circle cx="12" cy="9" r="3" fill="#ffffff"/>
+            </svg>
+          `),
+          scaledSize: { width: 28, height: 28 },
+          anchor: { x: 14, y: 14 }
+        }
+      };
+      newScheduledMarkers.push(destinationMarker);
+    } else {
+      console.log('❌ No location data available for destination');
+    }
+    
+    // Add middle station markers (GREEN for scheduled)
+    if (schedule.stops && Array.isArray(schedule.stops)) {
+      console.log('📅 Processing middle stations:', schedule.stops.length);
+      schedule.stops.forEach((stop: any, index: number) => {
+        console.log(`📅 Processing stop ${index}:`, stop);
+        if (stop && stop.lat && stop.long && stop.name) {
+          const scheduledTime = stop.time ? formatTime(stop.time) : 'N/A';
+          const stationOffset = getPerpendicularOffset(stop.lat, stop.long, true);
+          const marker = {
+            position: stationOffset,
+            label: {
+              text: `${stop.name}\n${scheduledTime}`,
+              color: '#000000',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              className: 'marker-label-scheduled'
+            },
+            title: `${stop.name} - Scheduled: ${scheduledTime}`,
+            icon: {
+              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#16a34a"/>
+                  <circle cx="12" cy="9" r="2" fill="#ffffff"/>
+                </svg>
+              `),
+          scaledSize: { width: 24, height: 24 },
+          anchor: { x: 12, y: 12 }
+            }
+          };
+          newScheduledMarkers.push(marker);
+          console.log(`✅ Added scheduled marker for stop ${index}:`, stop.name);
+        } else {
+          console.log(`❌ Invalid stop data ${index}:`, stop);
+        }
+      });
+    } else {
+      console.log('❌ No stops found or invalid stops data');
+    }
+    
+    console.log('📅 Created scheduled markers:', newScheduledMarkers.length);
+    console.log('📅 Scheduled markers details:', newScheduledMarkers);
+    
+    setScheduledMarkers(newScheduledMarkers);
+  }, []);
+
+  const createMarkers = React.useCallback((activeBusDoc: ActiveBusDoc, schedule?: any) => {
     console.log('🎯 Creating markers for activeBusDoc:', activeBusDoc);
     console.log('🎯 Middle stations:', activeBusDoc.middlestations);
     console.log('🎯 Current location:', activeBusDoc.currLat, activeBusDoc.currLong);
+    console.log('🎯 Schedule provided:', schedule);
     
     const newMarkers = [];
     
-    // Add starting place marker (RED)
+    // Helper function to find scheduled time for a station
+    const findScheduledTime = (stationName: string) => {
+      if (!schedule || !schedule.stops) return null;
+      
+      // Check middle stations
+      const middleStation = schedule.stops.find((stop: any) => 
+        stop.name && stop.name.toLowerCase().includes(stationName.toLowerCase())
+      );
+      if (middleStation && middleStation.time) {
+        return formatTime(middleStation.time);
+      }
+      
+      // Check starting place
+      if (schedule.startingPlace && schedule.startingPlace.toLowerCase().includes(stationName.toLowerCase())) {
+        return schedule.starttime;
+      }
+      
+      // Check destination
+      if (schedule.destination && schedule.destination.toLowerCase().includes(stationName.toLowerCase())) {
+        return schedule.endtime;
+      }
+      
+      return null;
+    };
+    
+    // Offset distance in degrees (approximately 200-300 meters for clear separation)
+    const OFFSET_DISTANCE = 0.002; // ~200 meters - much larger for clear separation
+    
+    // Function to calculate perpendicular offset for road-side placement
+    const getPerpendicularOffset = (lat: number, lng: number, isScheduled: boolean) => {
+      // For scheduled markers, offset to one side of the road
+      // For real-time markers, offset to the other side of the road
+      const sideMultiplier = isScheduled ? 1 : -1;
+      return {
+        lat: lat + (OFFSET_DISTANCE * sideMultiplier),
+        lng: lng + (OFFSET_DISTANCE * sideMultiplier * 0.8) // Larger lng offset for better visual separation
+      };
+    };
+    
+    // Add starting place marker (COMBINED)
     if (activeBusDoc.startingPlaceLocation && activeBusDoc.startingPlaceLocation.lat && activeBusDoc.startingPlaceLocation.long) {
       console.log('🎯 Adding starting place marker');
+      const startingPlaceOffset = getPerpendicularOffset(activeBusDoc.startingPlaceLocation.lat, activeBusDoc.startingPlaceLocation.long, false);
+      const scheduledTime = findScheduledTime(activeBusDoc.startingPlace);
+      const realTime = 'N/A'; // Start time not available in real-time data
+      
+      const labelText = scheduledTime 
+        ? `${activeBusDoc.startingPlace}\n🟢 ${scheduledTime} | 🔴 ${realTime}`
+        : `${activeBusDoc.startingPlace}\n🔴 ${realTime}`;
+      
       const startingPlaceMarker = {
-        position: { lat: activeBusDoc.startingPlaceLocation.lat, lng: activeBusDoc.startingPlaceLocation.long },
+        position: startingPlaceOffset,
         label: {
-          text: activeBusDoc.startingPlace,
+          text: labelText,
           color: '#000000',
-          fontSize: '16px',
+          fontSize: '14px',
           fontWeight: 'bold',
-          className: 'custom-marker-label'
+          className: 'marker-label-combined'
         },
         title: `${activeBusDoc.startingPlace} - Starting Point`,
+        type: 'combined' as const,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
             <svg width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -113,8 +444,8 @@ export const useBusTracking = (): UseBusTrackingReturn => {
               <circle cx="12" cy="9" r="3" fill="#ffffff"/>
             </svg>
           `),
-          scaledSize: new google.maps.Size(32, 32),
-          anchor: new google.maps.Point(16, 16)
+          scaledSize: { width: 32, height: 32 },
+          anchor: { x: 16, y: 16 }
         }
       };
       newMarkers.push(startingPlaceMarker);
@@ -123,19 +454,28 @@ export const useBusTracking = (): UseBusTrackingReturn => {
       console.log('❌ No starting place location data available');
     }
     
-    // Add destination marker (RED)
+    // Add destination marker (COMBINED)
     if (activeBusDoc.destinationLocation && activeBusDoc.destinationLocation.lat && activeBusDoc.destinationLocation.long) {
       console.log('🎯 Adding destination marker');
+      const destinationOffset = getPerpendicularOffset(activeBusDoc.destinationLocation.lat, activeBusDoc.destinationLocation.long, false);
+      const scheduledTime = findScheduledTime(activeBusDoc.destination);
+      const realTime = activeBusDoc.endtime || 'N/A';
+      
+      const labelText = scheduledTime 
+        ? `${activeBusDoc.destination}\n🟢 ${scheduledTime} | 🔴 ${realTime}`
+        : `${activeBusDoc.destination}\n🔴 ${realTime}`;
+      
       const destinationMarker = {
-        position: { lat: activeBusDoc.destinationLocation.lat, lng: activeBusDoc.destinationLocation.long },
+        position: destinationOffset,
         label: {
-          text: `${activeBusDoc.destination} (${activeBusDoc.endtime || 'N/A'})`,
+          text: labelText,
           color: '#000000',
-          fontSize: '16px',
+          fontSize: '14px',
           fontWeight: 'bold',
-          className: 'custom-marker-label'
+          className: 'marker-label-combined'
         },
-        title: `${activeBusDoc.destination} - Arrival: ${activeBusDoc.endtime || 'N/A'}`,
+        title: `${activeBusDoc.destination} - Arrival: ${realTime}`,
+        type: 'combined' as const,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
             <svg width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -143,8 +483,8 @@ export const useBusTracking = (): UseBusTrackingReturn => {
               <circle cx="12" cy="9" r="3" fill="#ffffff"/>
             </svg>
           `),
-          scaledSize: new google.maps.Size(32, 32),
-          anchor: new google.maps.Point(16, 16)
+          scaledSize: { width: 32, height: 32 },
+          anchor: { x: 16, y: 16 }
         }
       };
       newMarkers.push(destinationMarker);
@@ -162,16 +502,25 @@ export const useBusTracking = (): UseBusTrackingReturn => {
         
         // Validate station data
         if (station && station.lat && station.long && station.name) {
+          const stationOffset = getPerpendicularOffset(station.lat, station.long, false);
+          const scheduledTime = findScheduledTime(station.name);
+          const realTime = station.time || 'N/A';
+          
+          const labelText = scheduledTime 
+            ? `${station.name}\n🟢 ${scheduledTime} | 🔴 ${realTime}`
+            : `${station.name}\n🔴 ${realTime}`;
+          
           const marker = {
-            position: { lat: station.lat, lng: station.long },
+            position: stationOffset,
             label: {
-              text: `${station.name} (${station.time || 'N/A'})`,
+              text: labelText,
               color: '#000000',
-              fontSize: '16px',
+              fontSize: '14px',
               fontWeight: 'bold',
-              className: 'custom-marker-label'
+              className: 'marker-label-combined'
             },
-            title: `${station.name} - Arrival: ${station.time || 'N/A'}`,
+            title: `${station.name} - Arrival: ${realTime}`,
+            type: 'combined' as const,
             icon: {
               url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
                 <svg width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -179,8 +528,8 @@ export const useBusTracking = (): UseBusTrackingReturn => {
                   <circle cx="12" cy="9" r="3" fill="#ffffff"/>
                 </svg>
               `),
-              scaledSize: new google.maps.Size(32, 32),
-              anchor: new google.maps.Point(16, 16)
+          scaledSize: { width: 32, height: 32 },
+          anchor: { x: 16, y: 16 }
             }
           };
           newMarkers.push(marker);
@@ -199,6 +548,7 @@ export const useBusTracking = (): UseBusTrackingReturn => {
       const currentLocationMarker = {
         position: { lat: activeBusDoc.currLat, lng: activeBusDoc.currLong },
         title: `Current Location - ${activeBusDoc.address || 'Unknown Address'}`,
+        type: 'current' as const,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
             <svg width="48" height="48" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -216,8 +566,8 @@ export const useBusTracking = (): UseBusTrackingReturn => {
               <rect x="9.5" y="8" width="1" height="2" fill="#ffffff"/>
             </svg>
           `),
-          scaledSize: new google.maps.Size(48, 48),
-          anchor: new google.maps.Point(12, 24)
+          scaledSize: { width: 48, height: 48 },
+          anchor: { x: 12, y: 24 }
         }
       };
       newMarkers.push(currentLocationMarker);
@@ -229,11 +579,31 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     console.log('🎯 Final markers array:', newMarkers);
     console.log('🎯 Total markers created:', newMarkers.length);
     setMarkers(newMarkers);
+    
+    // Save marker data to localStorage for persistence
+    const currentLoc = {
+      lat: activeBusDoc.currLat,
+      lng: activeBusDoc.currLong
+    };
+    saveMarkerDataToStorage(activeBusDoc, polyline || '', newMarkers, currentLoc);
   }, []);
 
-  const startTracking = React.useCallback((busNumberPlate: string) => {
+  const startTracking = React.useCallback((busNumberPlate: string, schedule?: any) => {
     try {
       setError(null);
+      
+      console.log('🚀 Starting tracking for bus:', busNumberPlate);
+      console.log('📅 Schedule provided:', schedule);
+      console.log('📅 Schedule type:', typeof schedule);
+      
+      // Schedule will be used in combined markers when real-time data arrives
+      if (schedule) {
+        console.log('📅 Schedule provided, will be used in combined markers');
+      } else {
+        console.log('❌ No schedule provided for combined markers');
+      }
+      
+      // Test marker removed - scheduled markers should be displayed instead
       
       // Connect to Driver API socket
       const socket = io('http://localhost:3001');
@@ -299,9 +669,10 @@ export const useBusTracking = (): UseBusTrackingReturn => {
             lng: data.activeBus.currLong
           });
           
-          console.log('🎯 Creating markers for:', data.activeBus.middlestations?.length || 0, 'stations');
-          createMarkers(data.activeBus);
+          console.log('🎯 Creating combined markers for:', data.activeBus.middlestations?.length || 0, 'stations');
+          createMarkers(data.activeBus, schedule);
           setIsTracking(true);
+          
           console.log('✅ Bus update processed successfully');
         } else {
           console.log('❌ Invalid bus update data:', data);
@@ -326,13 +697,25 @@ export const useBusTracking = (): UseBusTrackingReturn => {
       socketRef.current = null;
     }
     
+    // Clear localStorage
+    clearMarkerDataFromStorage();
+    
     setIsTracking(false);
     setActiveBus(null);
     setPolyline(null);
     setCurrentLocation(null);
     setMarkers([]);
+    setScheduledMarkers([]);
     setError(null);
     setBusStatus('unknown');
+  }, []);
+
+  // Restore data from localStorage on component mount
+  useEffect(() => {
+    const restored = restoreMarkerDataFromStorage();
+    if (restored) {
+      console.log('🔄 Restored markers from localStorage on mount');
+    }
   }, []);
 
   // Cleanup on unmount
@@ -350,6 +733,7 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     polyline,
     currentLocation,
     markers,
+    scheduledMarkers,
     startTracking,
     stopTracking,
     error,

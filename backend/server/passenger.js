@@ -241,6 +241,53 @@ app.get('/api/passenger/places', wrap(async (req, res) => {
 	}
 }));
 
+// Get specific schedule from a bus
+app.get('/api/passenger/bus/:busnumberplate/schedule/:scheduleId', wrap(async (req, res) => {
+	try {
+		const { busnumberplate, scheduleId } = req.params;
+		
+		console.log(`Fetching schedule ${scheduleId} for bus ${busnumberplate}`);
+		
+		// Find the bus by busnumberplate
+		const bus = await Bus.findOne({ Bus_number_plate: busnumberplate });
+		
+		if (!bus) {
+			return res.status(404).json({
+				success: false,
+				message: `Bus with number plate ${busnumberplate} not found`
+			});
+		}
+		
+		console.log(`Found bus: ${bus.busName} (${bus.Bus_number_plate})`);
+		
+		// Find the specific schedule by ID
+		const schedule = bus.schedules.find(s => s._id.toString() === scheduleId);
+		
+		if (!schedule) {
+			return res.status(404).json({
+				success: false,
+				message: `Schedule with ID ${scheduleId} not found in bus ${busnumberplate}`
+			});
+		}
+		
+		console.log(`Found schedule: ${schedule.startingPlace} → ${schedule.destination}`);
+		
+		res.status(200).json({
+			success: true,
+			message: 'Schedule retrieved successfully',
+			schedule: schedule
+		});
+		
+	} catch (error) {
+		console.error('Error fetching schedule:', error);
+		res.status(500).json({
+			success: false,
+			message: 'Error fetching schedule',
+			error: error.message
+		});
+	}
+}));
+
 // Start server
 app.listen(PORT, () => {
 	console.log(`Passenger server running on port ${PORT}`);

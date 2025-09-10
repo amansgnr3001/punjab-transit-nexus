@@ -13,6 +13,23 @@ interface BusTrackingMapProps {
       className?: string;
     };
     title: string;
+    type?: 'scheduled' | 'realtime' | 'current';
+    icon?: {
+      url: string;
+      scaledSize: any;
+      anchor: any;
+    };
+  }>;
+  scheduledMarkers: Array<{
+    position: { lat: number; lng: number };
+    label: string | {
+      text: string;
+      color: string;
+      fontSize: string;
+      fontWeight: string;
+      className?: string;
+    };
+    title: string;
     icon?: {
       url: string;
       scaledSize: any;
@@ -36,14 +53,25 @@ const defaultCenter = {
 
 const BusTrackingMap: React.FC<BusTrackingMapProps> = ({
   markers,
+  scheduledMarkers,
   polyline,
   currentLocation,
   isTracking
 }) => {
+  console.log('🗺️ BusTrackingMap props:', {
+    markersCount: markers.length,
+    scheduledMarkersCount: scheduledMarkers.length,
+    polyline: polyline ? 'present' : 'null',
+    currentLocation,
+    isTracking
+  });
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyAzttkphjYlfyEbUoe-5NtAVexKsOI7924',
     libraries: ['geometry', 'drawing']
   });
+
+  console.log('🗺️ Map loading status:', { isLoaded, loadError });
+  console.log('🗺️ Google Maps API Key:', import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'Using fallback key');
 
   if (loadError) {
     return (
@@ -221,9 +249,27 @@ const BusTrackingMap: React.FC<BusTrackingMapProps> = ({
           ]
         }}
       >
-        {/* Render markers */}
+        {/* Render scheduled markers (GREEN) */}
+        {scheduledMarkers.map((marker, index) => {
+          console.log(`📅 Rendering scheduled marker ${index}:`, marker);
+          console.log(`📅 Marker position:`, marker.position);
+          console.log(`📅 Marker label:`, marker.label);
+          console.log(`📅 Marker icon:`, marker.icon);
+          
+          return (
+            <Marker
+              key={`scheduled-${index}`}
+              position={marker.position}
+              label={marker.label}
+              title={marker.title}
+              icon={marker.icon}
+            />
+          );
+        })}
+
+        {/* Render real-time markers (BLUE/RED) */}
         {markers.map((marker, index) => {
-          console.log(`🗺️ Rendering marker ${index}:`, marker);
+          console.log(`🎯 Rendering real-time marker ${index}:`, marker);
           
           // Custom icon for bus location (white car with red accents)
           const isBusLocation = typeof marker.label === 'string' && marker.label === '🚌';
@@ -234,12 +280,12 @@ const BusTrackingMap: React.FC<BusTrackingMapProps> = ({
             strokeColor: '#ff0000',
             strokeWeight: 2,
             scale: 1.8,
-            anchor: new google.maps.Point(12, 12)
+            anchor: { x: 12, y: 12 }
           } : marker.icon;
 
           return (
             <Marker
-              key={index}
+              key={`realtime-${index}`}
               position={marker.position}
               label={marker.label}
               title={marker.title}
