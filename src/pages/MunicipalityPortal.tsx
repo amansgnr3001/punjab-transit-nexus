@@ -4,16 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, User, LogIn, Bus, Route, Calendar, Plus, X, BarChart3, Loader2, AlertTriangle, X as CloseIcon } from "lucide-react";
+import { ArrowLeft, User, LogIn, Bus, Route, Calendar, Plus, X, BarChart3, Loader2, AlertTriangle, X as CloseIcon, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { io, Socket } from 'socket.io-client';
+import { useComplaints } from '@/hooks/useComplaints';
 
 const MunicipalityPortal = () => {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
+  const [loginForm, setLoginForm] = useState({ name: "", password: "" });
   const [activeSection, setActiveSection] = useState("dashboard");
   const [analyticsData, setAnalyticsData] = useState<{[key: string]: number}>({});
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
@@ -32,6 +33,9 @@ const MunicipalityPortal = () => {
   }>>([]);
   const [showEmergencyAlert, setShowEmergencyAlert] = useState(false);
   const [currentEmergency, setCurrentEmergency] = useState<any>(null);
+  
+  // Use complaints hook to get new complaints count
+  const { newComplaintsCount } = useComplaints();
   const [busForm, setBusForm] = useState({
     Bus_number_plate: "",
     busName: "",
@@ -55,7 +59,7 @@ const MunicipalityPortal = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginForm.username && loginForm.password) {
+    if (loginForm.name && loginForm.password) {
       try {
         // Call login API
         const response = await fetch('http://localhost:3000/api/municipality/login', {
@@ -64,7 +68,7 @@ const MunicipalityPortal = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            name: loginForm.username,
+            name: loginForm.name,
             password: loginForm.password
           })
         });
@@ -209,7 +213,7 @@ const MunicipalityPortal = () => {
     console.log('🚪 Municipality logged out - keeping socket connected for emergency room');
     
     setIsLoggedIn(false);
-    setLoginForm({ username: "", password: "" });
+    setLoginForm({ name: "", password: "" });
     setActiveSection("dashboard");
     // Don't clear emergency alerts - keep them for when they log back in
     setShowEmergencyAlert(false);
@@ -417,6 +421,7 @@ const MunicipalityPortal = () => {
     { id: "addRoute", title: "Add Route", icon: Plus },
     { id: "schedule", title: "Schedule", icon: Calendar },
     { id: "analytics", title: "View Analytics", icon: BarChart3 },
+    { id: "complaintRegister", title: "Complaint Register", icon: MessageSquare },
   ];
 
   const renderDashboardContent = () => {
@@ -833,6 +838,41 @@ const MunicipalityPortal = () => {
             </div>
           </div>
         );
+      case "complaintRegister":
+        return (
+          <div>
+            <h3 className="text-2xl font-bold mb-4">Complaint Register</h3>
+            <p className="text-muted-foreground mb-6">View and manage passenger complaints submitted through the system.</p>
+            
+            <Card className="p-6">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <MessageSquare className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-bold text-gray-800">Complaint Management</CardTitle>
+                    <CardDescription className="text-gray-600">
+                      Track and respond to passenger feedback and complaints
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h4 className="text-lg font-semibold text-gray-600 mb-2">Complaint Register</h4>
+                  <p className="text-gray-500 mb-4">
+                    This feature will display all submitted complaints from passengers.
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    Functionality coming soon...
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
       default:
         return (
           <div className="max-w-md">
@@ -849,7 +889,7 @@ const MunicipalityPortal = () => {
               <CardContent className="space-y-4">
                 <div className="text-center space-y-2">
                   <p><strong>Admin ID:</strong> MUN001</p>
-                  <p><strong>Name:</strong> {loginForm.username}</p>
+                  <p><strong>Name:</strong> {loginForm.name}</p>
                   <p><strong>Department:</strong> Transportation</p>
                   <p><strong>Status:</strong> <span className="text-government-green font-medium">Active</span></p>
                 </div>
@@ -1036,12 +1076,12 @@ const MunicipalityPortal = () => {
                 <CardContent className="pb-8">
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-gray-700 font-medium">Username</label>
+                      <label className="text-gray-700 font-medium">Name</label>
                       <Input
                         type="text"
-                        placeholder="Enter your username"
-                        value={loginForm.username}
-                        onChange={(e) => setLoginForm(prev => ({ ...prev, username: e.target.value }))}
+                        placeholder="Enter your name"
+                        value={loginForm.name}
+                        onChange={(e) => setLoginForm(prev => ({ ...prev, name: e.target.value }))}
                         className="border-purple-200 focus:border-purple-400"
                         required
                       />
@@ -1086,6 +1126,8 @@ const MunicipalityPortal = () => {
                               onClick={() => {
                                 if (item.id === "bus") {
                                   navigate('/bus-list');
+                                } else if (item.id === "complaintRegister") {
+                                  navigate('/municipality-portal/complaints');
                                 } else {
                                   setActiveSection(item.id);
                                 }
@@ -1098,6 +1140,11 @@ const MunicipalityPortal = () => {
                             >
                               <item.icon className="w-4 h-4 mr-2" />
                               {item.title}
+                              {item.id === "complaintRegister" && newComplaintsCount > 0 && (
+                                <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
+                                  {newComplaintsCount}
+                                </span>
+                              )}
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         ))}

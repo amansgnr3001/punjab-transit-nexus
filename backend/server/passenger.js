@@ -9,13 +9,14 @@ require('dotenv').config();
 const app = express();
 
 const PORT = process.env.PORT || 3002;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/realtime-bus-tracking';
+const MONGO_URI =  'mongodb://127.0.0.1:27017/realtime-bus-tracking';
 
 // Models (direct imports)
 const Bus = require('../models/Bus');
 const Driver = require('../models/Driver');
 const User = require('../models/Municipality');
 const Tracking = require('../models/activebuses');
+const Complaint = require('../models/Complaint');
 // CORS Configuration
 const corsOptions = {
   origin: [
@@ -284,6 +285,276 @@ app.get('/api/passenger/bus/:busnumberplate/schedule/:scheduleId', wrap(async (r
 			success: false,
 			message: 'Error fetching schedule',
 			error: error.message
+		});
+	}
+}));
+
+// Submit complaint
+app.post('/api/passenger/complaint', wrap(async (req, res) => {
+	try {
+		console.log('📝 Complaint submission received:', req.body);
+		
+		const { busnumberplate, startingplace, destination, description } = req.body;
+		
+		// Validate required fields
+		if (!busnumberplate || !startingplace || !destination || !description) {
+			return res.status(400).json({
+				success: false,
+				error: 'All fields are required: busnumberplate, startingplace, destination, description'
+			});
+		}
+		
+		// Create new complaint document
+		const complaint = new Complaint({
+			busnumberplate: busnumberplate.trim(),
+			startingplace: startingplace.trim(),
+			destination: destination.trim(),
+			description: description.trim()
+		});
+		
+		// Save to database
+		await complaint.save();
+		
+		console.log('✅ Complaint saved successfully:', complaint._id);
+		
+		res.json({
+			success: true,
+			message: 'Complaint submitted successfully',
+			complaintId: complaint._id,
+			complaint: {
+				_id: complaint._id,
+				busnumberplate: complaint.busnumberplate,
+				startingplace: complaint.startingplace,
+				destination: complaint.destination,
+				description: complaint.description,
+				createdAt: complaint.createdAt
+			}
+		});
+		
+	} catch (error) {
+		console.error('❌ Error submitting complaint:', error);
+		res.status(500).json({
+			success: false,
+			error: 'Failed to submit complaint',
+			message: error.message
+		});
+	}
+}));
+
+// Get all bus number plates
+app.get('/api/passenger/bus-number-plates', wrap(async (req, res) => {
+	try {
+		console.log('🚌 Fetching all bus number plates...');
+		
+		// Get all buses and extract only the bus number plates
+		const buses = await Bus.find({}, 'Bus_number_plate');
+		
+		// Extract bus number plates from the results
+		const busNumberPlates = buses.map(bus => bus.Bus_number_plate);
+		
+		console.log(`✅ Found ${busNumberPlates.length} bus number plates:`, busNumberPlates);
+		
+		res.json({
+			success: true,
+			totalBuses: busNumberPlates.length,
+			busNumberPlates: busNumberPlates
+		});
+		
+	} catch (error) {
+		console.error('❌ Error fetching bus number plates:', error);
+		res.status(500).json({
+			success: false,
+			error: 'Failed to fetch bus number plates',
+			message: error.message
+		});
+	}
+}));
+
+// Get unique places for a specific bus
+app.get('/api/passenger/bus/:busnumberplate/places', wrap(async (req, res) => {
+	try {
+		const { busnumberplate } = req.params;
+		
+		console.log('🚌 Fetching unique places for bus:', busnumberplate);
+		
+		// Find the bus with the given number plate
+		const bus = await Bus.findOne({ Bus_number_plate: busnumberplate });
+		
+		if (!bus) {
+			return res.status(404).json({
+				success: false,
+				error: 'Bus not found',
+				message: `No bus found with number plate: ${busnumberplate}`
+			});
+		}
+		
+		// Set to store unique places
+		const uniquePlaces = new Set();
+		
+		// Traverse each schedule of the bus
+		bus.schedules.forEach(schedule => {
+			// Add starting place
+			if (schedule.startingPlace) {
+				uniquePlaces.add(schedule.startingPlace);
+			}
+			
+			// Add destination
+			if (schedule.destination) {
+				uniquePlaces.add(schedule.destination);
+			}
+			
+			// Add all stops
+			if (schedule.stops && Array.isArray(schedule.stops)) {
+				schedule.stops.forEach(stop => {
+					if (stop.name) {
+						uniquePlaces.add(stop.name);
+					}
+				});
+			}
+		});
+		
+		// Convert Set to Array and sort alphabetically
+		const placesArray = Array.from(uniquePlaces).sort();
+		
+		console.log(`✅ Found ${placesArray.length} unique places for bus ${busnumberplate}:`, placesArray);
+		
+		res.json({
+			success: true,
+			busNumberPlate: busnumberplate,
+			busName: bus.busName,
+			totalPlaces: placesArray.length,
+			places: placesArray
+		});
+		
+	} catch (error) {
+		console.error('❌ Error fetching unique places for bus:', error);
+		res.status(500).json({
+			success: false,
+			error: 'Failed to fetch unique places for bus',
+			message: error.message
+		});
+	}
+}));
+
+// Route to insert your actual bus data
+app.post('/api/passenger/insert-actual-data', wrap(async (req, res) => {
+	try {
+		console.log('🚌 Inserting actual bus data...');
+		
+		// Clear existing data
+		await Bus.deleteMany({});
+		console.log('🗑️ Cleared existing bus data');
+		
+		// Insert your actual bus data
+		const actualBusData = {
+			Bus_number_plate: '1234',
+			busName: 'Rana',
+			schedules: [
+				{
+					starttime: '16:00',
+					endtime: '17:30',
+					startingPlace: 'RRU gandhinagar',
+					destination: 'Infocity gandhinagar',
+					startLocation: { lat: 23.1544551, long: 72.8849844 },
+					destinationLocation: { lat: 23.1935088, long: 72.63459139999999 },
+					stops: [
+						{
+							name: 'Dahegam',
+							lat: 23.1637196,
+							long: 72.81024500000001,
+							time: 1198
+						},
+						{
+							name: 'kudasan',
+							lat: 23.179589,
+							long: 72.63474599999999,
+							time: 3268
+						}
+					],
+					days: ['monday', 'saturday']
+				},
+				{
+					starttime: '10:30',
+					endtime: '13:00',
+					startingPlace: 'RRU gandhinagar',
+					destination: 'Infocity Gandhinagar',
+					startLocation: { lat: 23.1544551, long: 72.8849844 },
+					destinationLocation: { lat: 23.1935088, long: 72.63459139999999 },
+					stops: [
+						{
+							name: 'Dahegam',
+							lat: 23.1637196,
+							long: 72.81024500000001,
+							time: 1198
+						},
+						{
+							name: 'Kudasan',
+							lat: 23.179589,
+							long: 72.63474599999999,
+							time: 3268
+						}
+					],
+					days: ['Monday', 'Saturday']
+				}
+			]
+		};
+		
+		const newBus = new Bus(actualBusData);
+		await newBus.save();
+		
+		console.log('✅ Actual bus data inserted successfully');
+		
+		res.json({
+			success: true,
+			message: 'Actual bus data inserted successfully',
+			bus: newBus
+		});
+		
+	} catch (error) {
+		console.error('❌ Error inserting actual bus data:', error);
+		res.status(500).json({
+			success: false,
+			error: 'Failed to insert actual bus data',
+			message: error.message
+		});
+	}
+}));
+
+// Debug route to check collections
+app.get('/api/passenger/debug-collections', wrap(async (req, res) => {
+	try {
+		console.log('🔍 Debugging collections...');
+		
+		// Get all collections
+		const collections = await mongoose.connection.db.listCollections().toArray();
+		console.log('📁 Available collections:', collections.map(c => c.name));
+		
+		// Check buses collection
+		const busesCount = await mongoose.connection.db.collection('buses').countDocuments();
+		console.log('🚌 Buses collection count:', busesCount);
+		
+		// Check Bus collection (uppercase)
+		const BusCount = await mongoose.connection.db.collection('Bus').countDocuments();
+		console.log('🚌 Bus collection count:', BusCount);
+		
+		// Get sample from buses collection
+		const sampleBuses = await mongoose.connection.db.collection('buses').find({}).limit(2).toArray();
+		console.log('📋 Sample from buses collection:', sampleBuses);
+		
+		res.json({
+			success: true,
+			collections: collections.map(c => c.name),
+			busesCount,
+			BusCount,
+			sampleBuses
+		});
+		
+	} catch (error) {
+		console.error('❌ Error debugging collections:', error);
+		res.status(500).json({
+			success: false,
+			error: 'Failed to debug collections',
+			message: error.message
 		});
 	}
 }));

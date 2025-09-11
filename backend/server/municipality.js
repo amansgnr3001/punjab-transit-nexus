@@ -18,6 +18,7 @@ const Bus = require('../models/Bus');
 const Driver = require('../models/Driver');
 const User = require('../models/Municipality');
 const Tracking = require('../models/activebuses');
+const Complaint = require('../models/Complaint');
 // CORS Configuration
 const corsOptions = {
   origin: [
@@ -378,6 +379,34 @@ app.post('/api/municipality/login', wrap(async (req, res) => {
 		res.status(500).json({
 			success: false,
 			error: 'Internal server error during login',
+			message: error.message
+		});
+	}
+}));
+
+// Get all complaints
+app.get('/api/municipality/complaints', wrap(async (req, res) => {
+	try {
+		console.log('📝 Fetching all complaints...');
+		
+		// Get all complaints sorted by creation date (newest first)
+		const complaints = await Complaint.find({})
+			.sort({ createdAt: -1 })
+			.lean(); // Use lean() for better performance
+		
+		console.log(`✅ Found ${complaints.length} complaints`);
+		
+		res.json({
+			success: true,
+			totalComplaints: complaints.length,
+			complaints: complaints
+		});
+		
+	} catch (error) {
+		console.error('❌ Error fetching complaints:', error);
+		res.status(500).json({
+			success: false,
+			error: 'Failed to fetch complaints',
 			message: error.message
 		});
 	}

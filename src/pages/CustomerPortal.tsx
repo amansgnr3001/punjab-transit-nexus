@@ -2,20 +2,36 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, MapPin, Navigation, Loader2, Search, Bus, MessageSquare } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ArrowLeft, Calendar, MapPin, Navigation, Loader2, Search, Bus, MessageSquare, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { usePlaces } from "@/hooks/usePlaces";
 import { useBusSearch } from "@/hooks/useBusSearch";
+import { useBusNumberPlates } from "@/hooks/useBusNumberPlates";
+import { useBusPlaces } from "@/hooks/useBusPlaces";
 
 const CustomerPortal = () => {
   const navigate = useNavigate();
   const [selectedDay, setSelectedDay] = useState("");
   const [startingPoint, setStartingPoint] = useState("");
   const [destination, setDestination] = useState("");
+  const [showComplaintForm, setShowComplaintForm] = useState(false);
+  const [complaintForm, setComplaintForm] = useState({
+    busnumberplate: "",
+    startingplace: "",
+    destination: "",
+    description: ""
+  });
+  const [submittingComplaint, setSubmittingComplaint] = useState(false);
 
   // Use the custom hooks
   const { places, loading: placesLoading, error: placesError } = usePlaces();
   const { searchBuses, loading: searchLoading, error: searchError } = useBusSearch();
+  const { busNumberPlates, loading: busPlatesLoading, error: busPlatesError } = useBusNumberPlates();
+  const { places: busPlaces, loading: busPlacesLoading, error: busPlacesError } = useBusPlaces(complaintForm.busnumberplate);
 
   const daysOfWeek = [
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
@@ -52,8 +68,89 @@ const CustomerPortal = () => {
   };
 
   const handleComplain = () => {
-    alert('Complaint feature coming soon!');
-    console.log('Complain button clicked');
+    setShowComplaintForm(true);
+    console.log('Complain button clicked - opening form');
+  };
+
+  const handleComplaintFormChange = (field: string, value: string) => {
+    setComplaintForm(prev => {
+      const newForm = {
+        ...prev,
+        [field]: value
+      };
+      
+      // Clear starting place and destination when bus number plate changes
+      if (field === 'busnumberplate') {
+        newForm.startingplace = '';
+        newForm.destination = '';
+      }
+      
+      return newForm;
+    });
+  };
+
+  const handleComplaintSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate form
+    if (!complaintForm.busnumberplate || !complaintForm.startingplace || !complaintForm.destination || !complaintForm.description) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    
+    setSubmittingComplaint(true);
+    
+    try {
+      const response = await fetch('http://localhost:3002/api/passenger/complaint', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          busnumberplate: complaintForm.busnumberplate,
+          startingplace: complaintForm.startingplace,
+          destination: complaintForm.destination,
+          description: complaintForm.description
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('Complaint submitted successfully!');
+        console.log('Complaint submitted:', data);
+        
+        // Close form and reset
+        setShowComplaintForm(false);
+        setComplaintForm({
+          busnumberplate: "",
+          startingplace: "",
+          destination: "",
+          description: ""
+        });
+        
+        // Redirect to passenger portal dashboard
+        navigate('/customer-portal');
+      } else {
+        alert(`Failed to submit complaint: ${data.message || data.error || 'Unknown error'}`);
+        console.error('Complaint submission failed:', data);
+      }
+    } catch (error) {
+      console.error('Error submitting complaint:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setSubmittingComplaint(false);
+    }
+  };
+
+  const handleCloseComplaintForm = () => {
+    setShowComplaintForm(false);
+    setComplaintForm({
+      busnumberplate: "",
+      startingplace: "",
+      destination: "",
+      description: ""
+    });
   };
 
   return (
@@ -293,6 +390,204 @@ const CustomerPortal = () => {
           </div>
         </div>
       </main>
+
+      {/* Complaint Form Modal */}
+      <Dialog open={showComplaintForm} onOpenChange={setShowComplaintForm}>
+        <DialogContent className="max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-800">
+              <MessageSquare className="w-5 h-5 text-blue-600" />
+              Submit Complaint
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Please provide details about your complaint regarding the bus service.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleComplaintSubmit} className="space-y-4">
+            {/* Bus Number Plate */}
+            <div className="space-y-2">
+              <Label htmlFor="busnumberplate" className="text-sm font-medium text-gray-700">
+                Bus Number Plate *
+              </Label>
+              <Select 
+                value={complaintForm.busnumberplate} 
+                onValueChange={(value) => handleComplaintFormChange('busnumberplate', value)}
+              >
+                <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                  <SelectValue placeholder="Select a bus number plate" />
+                </SelectTrigger>
+                <SelectContent>
+                  {busPlatesLoading ? (
+                    <SelectItem value="loading" disabled>
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading buses...
+                      </div>
+                    </SelectItem>
+                  ) : busPlatesError ? (
+                    <SelectItem value="error" disabled>
+                      Error loading buses
+                    </SelectItem>
+                  ) : busNumberPlates.length === 0 ? (
+                    <SelectItem value="no-buses" disabled>
+                      No buses available
+                    </SelectItem>
+                  ) : (
+                    busNumberPlates.map((plate) => (
+                      <SelectItem key={plate} value={plate}>
+                        {plate}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Starting Place */}
+            <div className="space-y-2">
+              <Label htmlFor="startingplace" className="text-sm font-medium text-gray-700">
+                Starting Place *
+              </Label>
+              <Select 
+                value={complaintForm.startingplace} 
+                onValueChange={(value) => handleComplaintFormChange('startingplace', value)}
+                disabled={!complaintForm.busnumberplate || busPlacesLoading}
+              >
+                <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                  <SelectValue placeholder={
+                    !complaintForm.busnumberplate 
+                      ? "Select a bus first" 
+                      : busPlacesLoading 
+                        ? "Loading places..." 
+                        : "Select starting place"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {!complaintForm.busnumberplate ? (
+                    <SelectItem value="no-bus" disabled>
+                      Please select a bus number plate first
+                    </SelectItem>
+                  ) : busPlacesLoading ? (
+                    <SelectItem value="loading" disabled>
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading places...
+                      </div>
+                    </SelectItem>
+                  ) : busPlacesError ? (
+                    <SelectItem value="error" disabled>
+                      Error loading places
+                    </SelectItem>
+                  ) : busPlaces.length === 0 ? (
+                    <SelectItem value="no-places" disabled>
+                      No places available for this bus
+                    </SelectItem>
+                  ) : (
+                    busPlaces.map((place) => (
+                      <SelectItem key={place} value={place}>
+                        {place}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Destination */}
+            <div className="space-y-2">
+              <Label htmlFor="destination" className="text-sm font-medium text-gray-700">
+                Destination *
+              </Label>
+              <Select 
+                value={complaintForm.destination} 
+                onValueChange={(value) => handleComplaintFormChange('destination', value)}
+                disabled={!complaintForm.busnumberplate || busPlacesLoading}
+              >
+                <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                  <SelectValue placeholder={
+                    !complaintForm.busnumberplate 
+                      ? "Select a bus first" 
+                      : busPlacesLoading 
+                        ? "Loading places..." 
+                        : "Select destination"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {!complaintForm.busnumberplate ? (
+                    <SelectItem value="no-bus" disabled>
+                      Please select a bus number plate first
+                    </SelectItem>
+                  ) : busPlacesLoading ? (
+                    <SelectItem value="loading" disabled>
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading places...
+                      </div>
+                    </SelectItem>
+                  ) : busPlacesError ? (
+                    <SelectItem value="error" disabled>
+                      Error loading places
+                    </SelectItem>
+                  ) : busPlaces.length === 0 ? (
+                    <SelectItem value="no-places" disabled>
+                      No places available for this bus
+                    </SelectItem>
+                  ) : (
+                    busPlaces.map((place) => (
+                      <SelectItem key={place} value={place}>
+                        {place}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="description" className="text-sm font-medium text-gray-700">
+                Complaint Description *
+              </Label>
+              <Textarea
+                id="description"
+                placeholder="Please describe your complaint in detail..."
+                value={complaintForm.description}
+                onChange={(e) => handleComplaintFormChange('description', e.target.value)}
+                required
+                rows={4}
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
+              />
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCloseComplaintForm}
+                className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={submittingComplaint}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submittingComplaint ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  'Submit Complaint'
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

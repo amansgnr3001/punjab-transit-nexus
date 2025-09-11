@@ -12,6 +12,7 @@ import DriverPortal from "./pages/DriverPortal";
 import MunicipalityPortal from "./pages/MunicipalityPortal";
 import BusListPage from "./pages/BusListPage";
 import CustomerBusListPage from "./pages/CustomerBusListPage";
+import ComplaintsPage from "./pages/ComplaintsPage";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,8 @@ const App = () => (
           <Route path="/municipality-portal" element={<MunicipalityPortal />} />
           <Route path="/bus-list" element={<BusListPage />} />
           <Route path="/customer-bus-list" element={<CustomerBusListPage />} />
+          <Route path="/complaints" element={<ComplaintsPage />} />
+          <Route path="/municipality-portal/complaints" element={<ComplaintsPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
