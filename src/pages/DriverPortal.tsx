@@ -37,6 +37,7 @@ const DriverPortal = () => {
   const [socket, setSocket] = useState(null);
   const [journeyStatus, setJourneyStatus] = useState('0'); // 0 = no journey, 1 = journey active
   const [currentBusDetails, setCurrentBusDetails] = useState(null); // Store current bus details for SOS
+  const [isLocationTrackingStopped, setIsLocationTrackingStopped] = useState(false); // Track if location tracking stopped due to SOS
 
   // Custom hook for bus routes
   const { startingPlaces, destinations, loading: routesLoading, error: routesError, fetchRoutes, clearRoutes } = useBusRoutes();
@@ -336,6 +337,9 @@ const DriverPortal = () => {
         localStorage.setItem('driverJourneyStatus', '1');
         setJourneyStatus('1');
         
+        // Reset location tracking stopped flag for new journey
+        setIsLocationTrackingStopped(false);
+        
         // Initialize socket connection for location tracking and SOS
         const newSocket = io('http://localhost:3001');
         setSocket(newSocket);
@@ -446,17 +450,58 @@ const DriverPortal = () => {
       return;
     }
 
-    // Send SOS_info event to backend
-    const sosData = {
-      busNumberPlate: currentBusDetails.busNumberPlate
-    };
+    // Get current location for emergency
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const sosData = {
+            driverId: currentBusDetails.driverId,
+            busNumberPlate: currentBusDetails.busNumberPlate,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            timestamp: new Date().toISOString()
+          };
 
-    console.log('🚨 Sending SOS alert:', sosData);
-    socket.emit('SOS_info', sosData);
-    
-    // Show confirmation to driver
-    alert('SOS Alert! Emergency assistance has been notified. Your location and bus details have been shared with emergency services.');
-    console.log('🚨 SOS alert sent to emergency services');
+          console.log('🚨 Sending SOS alert with location:', sosData);
+          socket.emit('SOS_info', sosData);
+
+          // Stop location tracking interval when SOS is clicked
+          if (locationIntervalId) {
+            clearInterval(locationIntervalId);
+            setLocationIntervalId(null);
+            setIsLocationTrackingStopped(true);
+            console.log('🛑 Location tracking stopped due to SOS alert');
+          }
+
+          // Reset journey status to show "Start Journey" instead of "Active Journey"
+          setIsJourneyActive(false);
+          setActiveJourney(null);
+          setJourneyStatus('0');
+          localStorage.setItem('driverJourneyStatus', '0');
+          localStorage.removeItem('driverBusNumberPlate');
+          localStorage.removeItem('currentBusDetails');
+          console.log('🔄 Journey status reset to inactive due to SOS alert');
+
+          // Disconnect socket since journey is ended
+          if (socket) {
+            socket.disconnect();
+            setSocket(null);
+            console.log('🔌 Socket disconnected due to SOS alert');
+          }
+          
+          // Show confirmation to driver
+          alert('SOS Alert! Emergency assistance has been notified with your location. Journey has been ended and you can start a new journey once the emergency is resolved.');
+          console.log('🚨 SOS alert sent to emergency services');
+        },
+        (error) => {
+          console.error('❌ Error getting location for SOS:', error);
+          alert('Error: Could not get your location for emergency alert. Please try again.');
+        }
+      );
+    } else {
+      console.error('❌ Geolocation not supported');
+      alert('Error: Location services not available for emergency alert.');
+    }
   };
 
   return (
@@ -751,6 +796,14 @@ const DriverPortal = () => {
                       <p className="text-sm text-gray-700"><strong>Bus No:</strong> {activeJourney?.busNumberPlate}</p>
                       <p className="text-sm text-gray-700"><strong>Bus Name:</strong> {activeJourney?.busName}</p>
                       <p className="text-sm text-gray-700"><strong>Status:</strong> <span className="text-gray-600 font-medium">In Progress</span></p>
+                      <p className="text-sm text-gray-700">
+                        <strong>Location Tracking:</strong> 
+                        {isLocationTrackingStopped ? (
+                          <span className="text-red-600 font-medium"> Stopped (SOS Alert)</span>
+                        ) : (
+                          <span className="text-green-600 font-medium"> Active</span>
+                        )}
+                      </p>
                     </div>
                     <Button 
                       className="w-full bg-gray-800 hover:bg-gray-900 text-white"
@@ -795,6 +848,7 @@ const DriverPortal = () => {
                           // Set journey status to inactive in localStorage
                           localStorage.setItem('driverJourneyStatus', '0');
                           setJourneyStatus('0');
+                          setIsLocationTrackingStopped(false); // Reset location tracking flag
                           localStorage.removeItem('driverBusNumberPlate');
                         } catch (error) {
                           console.error('Error in destination reached process:', error);

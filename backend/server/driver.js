@@ -23,6 +23,7 @@ const Bus = require('../models/Bus');
 const Driver = require('../models/Driver');
 const User = require('../models/Municipality');
 const Tracking = require('../models/activebuses');
+const Emergency = require('../models/Emergency');
 
 // Helper function to find closest point on route
 function findClosestPointOnRoute(location, routePoints) {
@@ -358,17 +359,20 @@ io.on('connection', (socket) => {
 	// SOS_info event for emergency situations
 	socket.on('SOS_info', async (data) => {
 		try {
-			const { busNumberPlate } = data;
+			const { driverId, busNumberPlate, latitude, longitude, timestamp } = data;
 			
 			console.log('=== SOS_INFO EVENT RECEIVED ===');
+			console.log('Driver ID:', driverId);
 			console.log('Bus number plate:', busNumberPlate);
+			console.log('Location:', latitude, longitude);
+			console.log('Timestamp:', timestamp);
 			
 			// Validate required data
-			if (!busNumberPlate) {
-				console.log('❌ Missing busNumberPlate in SOS_info');
+			if (!driverId || !busNumberPlate || !latitude || !longitude) {
+				console.log('❌ Missing required fields in SOS_info');
 				socket.emit('sos_response', {
 					success: false,
-					message: 'Missing required field: busNumberPlate'
+					message: 'Missing required fields: driverId, busNumberPlate, latitude, longitude'
 				});
 				return;
 			}
@@ -402,6 +406,19 @@ io.on('connection', (socket) => {
 			await activeBusDoc.save();
 
 			console.log('✅ Bus document updated - destination set to "stuck"');
+
+			// Save emergency data to database
+			console.log('💾 Saving emergency data to database...');
+			const emergencyData = new Emergency({
+				driverId: driverId,
+				busNumberPlate: busNumberPlate,
+				latitude: latitude,
+				longitude: longitude,
+				timestamp: timestamp ? new Date(timestamp) : new Date()
+			});
+			
+			await emergencyData.save();
+			console.log('✅ Emergency data saved to database');
 
 			// Broadcast emergency message to emergency room
 			const emergencyMessage = {
