@@ -19,8 +19,23 @@ interface BusSearchResult {
   isactive: boolean;
 }
 
+interface MultiHopRoute {
+  middleStation: string;
+  totalETA: number;
+  firstLeg: BusSearchResult[];
+  secondLeg: BusSearchResult[];
+}
+
+interface BusSearchResponse {
+  success: boolean;
+  message: string;
+  buses: BusSearchResult[];
+  routeType: 'direct' | 'multi-hop' | 'none';
+  multiHopRoute?: MultiHopRoute;
+}
+
 interface UseBusSearchReturn {
-  searchBuses: (day: string, startingPlace: string, destination: string) => Promise<BusSearchResult[]>;
+  searchBuses: (day: string, startingPlace: string, destination: string) => Promise<BusSearchResponse>;
   loading: boolean;
   error: string | null;
 }
@@ -29,7 +44,7 @@ export const useBusSearch = (): UseBusSearchReturn => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const searchBuses = async (day: string, startingPlace: string, destination: string): Promise<BusSearchResult[]> => {
+  const searchBuses = async (day: string, startingPlace: string, destination: string): Promise<BusSearchResponse> => {
     try {
       setLoading(true);
       setError(null);
@@ -44,15 +59,25 @@ export const useBusSearch = (): UseBusSearchReturn => {
       const data = await response.json();
       
       if (data.success) {
-        return data.buses;
+        return data;
       } else {
         setError(data.message || 'Failed to search buses');
-        return [];
+        return {
+          success: false,
+          message: data.message || 'Failed to search buses',
+          buses: [],
+          routeType: 'none'
+        };
       }
     } catch (err) {
       setError('Network error. Please try again.');
       console.error('Error searching buses:', err);
-      return [];
+      return {
+        success: false,
+        message: 'Network error. Please try again.',
+        buses: [],
+        routeType: 'none'
+      };
     } finally {
       setLoading(false);
     }

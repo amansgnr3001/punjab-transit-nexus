@@ -24,10 +24,25 @@ interface BusSearchResult {
   isactive: boolean;
 }
 
+interface MultiHopRoute {
+  middleStation: string;
+  totalETA: number;
+  firstLeg: BusSearchResult[];
+  secondLeg: BusSearchResult[];
+}
+
+interface BusSearchResponse {
+  success: boolean;
+  message: string;
+  buses: BusSearchResult[];
+  routeType: 'direct' | 'multi-hop' | 'none';
+  multiHopRoute?: MultiHopRoute;
+}
+
 const BusSearchResults = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [buses, setBuses] = useState<BusSearchResult[]>([]);
+  const [searchResponse, setSearchResponse] = useState<BusSearchResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busStatuses, setBusStatuses] = useState<Record<string, 'active' | 'reached' | 'unknown'>>({});
@@ -36,11 +51,11 @@ const BusSearchResults = () => {
   const searchParams = location.state?.searchParams || {};
 
   useEffect(() => {
-    if (location.state?.buses) {
-      setBuses(location.state.buses);
+    if (location.state?.searchResponse) {
+      setSearchResponse(location.state.searchResponse);
       setLoading(false);
     } else {
-      // If no buses passed, redirect back to search
+      // If no search response passed, redirect back to search
       navigate('/customer-portal');
     }
   }, [location.state, navigate]);
@@ -60,6 +75,32 @@ const BusSearchResults = () => {
     
     return `${diffHours}h ${diffMinutes}m`;
   };
+
+  const formatETA = (etaSeconds: number) => {
+    const hours = Math.floor(etaSeconds / 3600);
+    const minutes = Math.floor((etaSeconds % 3600) / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else {
+      return `${minutes}m`;
+    }
+  };
+
+  // Get all buses from the search response
+  const getAllBuses = (): BusSearchResult[] => {
+    if (!searchResponse) return [];
+    
+    if (searchResponse.routeType === 'direct') {
+      return searchResponse.buses;
+    } else if (searchResponse.routeType === 'multi-hop' && searchResponse.multiHopRoute) {
+      return [...searchResponse.multiHopRoute.firstLeg, ...searchResponse.multiHopRoute.secondLeg];
+    }
+    
+    return [];
+  };
+
+  const buses = getAllBuses();
 
   if (loading) {
     return (
@@ -168,6 +209,66 @@ const BusSearchResults = () => {
           </div>
         </div>
 
+        {/* Multi-hop Route Information */}
+        {searchResponse?.routeType === 'multi-hop' && searchResponse.multiHopRoute && (
+          <div className="mb-8">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-8 shadow-sm">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Navigation className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Multi-hop Route Found</h2>
+                  <p className="text-blue-600 font-medium">
+                    Via {searchResponse.multiHopRoute.middleStation} • 
+                    Total ETA: {formatETA(searchResponse.multiHopRoute.totalETA)}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* First Leg */}
+                <div className="bg-white rounded-lg p-6 border border-blue-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                    <h3 className="font-semibold text-gray-900">First Leg</h3>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm text-gray-600">
+                      From <span className="font-medium text-gray-900">{searchParams.startingPoint}</span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      To <span className="font-medium text-gray-900">{searchResponse.multiHopRoute.middleStation}</span>
+                    </div>
+                    <div className="text-sm text-blue-600 font-medium">
+                      {searchResponse.multiHopRoute.firstLeg.length} bus(es) available
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Second Leg */}
+                <div className="bg-white rounded-lg p-6 border border-blue-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                    <h3 className="font-semibold text-gray-900">Second Leg</h3>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm text-gray-600">
+                      From <span className="font-medium text-gray-900">{searchResponse.multiHopRoute.middleStation}</span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      To <span className="font-medium text-gray-900">{searchParams.destination}</span>
+                    </div>
+                    <div className="text-sm text-blue-600 font-medium">
+                      {searchResponse.multiHopRoute.secondLeg.length} bus(es) available
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Bus Results */}
         {buses.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-16 text-center shadow-sm">
@@ -187,7 +288,14 @@ const BusSearchResults = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {buses.map((bus) => (
+            {buses.map((bus, index) => {
+              // Determine which leg this bus belongs to for multi-hop routes
+              const isFirstLeg = searchResponse?.routeType === 'multi-hop' && 
+                searchResponse.multiHopRoute?.firstLeg.some(b => b._id === bus._id);
+              const isSecondLeg = searchResponse?.routeType === 'multi-hop' && 
+                searchResponse.multiHopRoute?.secondLeg.some(b => b._id === bus._id);
+              
+              return (
               <div 
                 key={bus._id} 
                 className="bg-white rounded-xl border border-gray-200 transition-all hover:shadow-lg hover:border-gray-300 shadow-sm"
@@ -200,7 +308,20 @@ const BusSearchResults = () => {
                         <Bus className="w-6 h-6 text-gray-600" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-1">{bus.busName}</h3>
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="text-xl font-bold text-gray-900">{bus.busName}</h3>
+                          {/* Leg indicator for multi-hop routes */}
+                          {isFirstLeg && (
+                            <div className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                              Leg 1
+                            </div>
+                          )}
+                          {isSecondLeg && (
+                            <div className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                              Leg 2
+                            </div>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-gray-500">Bus #{bus.Bus_number_plate}</span>
                           <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
@@ -350,7 +471,8 @@ const BusSearchResults = () => {
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

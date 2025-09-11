@@ -43,12 +43,12 @@ const CustomerPortal = () => {
     }
 
     try {
-      const buses = await searchBuses(selectedDay, startingPoint, destination);
+      const searchResponse = await searchBuses(selectedDay, startingPoint, destination);
       
       // Navigate to results page with the search results and parameters
       navigate('/bus-search-results', {
         state: {
-          buses,
+          searchResponse,
           searchParams: {
             day: selectedDay,
             startingPoint,

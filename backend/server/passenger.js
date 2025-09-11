@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const morgan = require('morgan');
 const bcrypt = require('bcrypt');
+const fetch = require('node-fetch');
 require('dotenv').config();
 
 const app = express();
@@ -67,6 +68,71 @@ function wrap(handler) {
 // Basic API Routes
 
 // Search buses by day, starting place, and destination
+// Helper function to calculate ETA using Google Directions API
+async function calculateETA(origin, destination) {
+	try {
+		const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&key=AIzaSyAzttkphjYlfyEbUoe-5NtAVexKsOI7924`;
+		
+		const response = await fetch(directionsUrl);
+		const data = await response.json();
+		
+		if (data.status === 'OK' && data.routes && data.routes.length > 0) {
+			return data.routes[0].legs[0].duration.value; // Duration in seconds
+		}
+		
+		return Infinity; // Return a large number if no route found
+	} catch (error) { 
+		console.error('Error calculating ETA:', error);
+		return Infinity;
+	}
+}
+
+// Helper function to process ETA calculations in batches to avoid rate limiting
+async function calculateETABatch(middleStations, destination, batchSize = 3, delayMs = 150) {
+	const results = [];
+	
+	// Process stations in batches
+	for (let i = 0; i < middleStations.length; i += batchSize) {
+		const batch = middleStations.slice(i, i + batchSize);
+		console.log(`🔄 Processing batch ${Math.floor(i / batchSize) + 1}: ${batch.length} stations`);
+		
+		// Process current batch in parallel
+		const batchPromises = batch.map(async (middleStation) => {
+			try {
+				console.log(`Calculating ETA from ${middleStation.name} to ${destination}...`);
+				const eta = await calculateETA(middleStation.name, destination);
+				return {
+					middleStation,
+					eta,
+					success: true
+				};
+			} catch (error) {
+				console.error(`Error calculating ETA for ${middleStation.name}:`, error);
+				return {
+					middleStation,
+					eta: Infinity,
+					success: false,
+					error: error.message
+				};
+			}
+		});
+		
+		// Wait for current batch to complete
+		const batchResults = await Promise.all(batchPromises);
+		results.push(...batchResults);
+		
+		// Add delay between batches (except for the last batch)
+		if (i + batchSize < middleStations.length) {
+			console.log(`⏳ Waiting ${delayMs}ms before next batch...`);
+			await new Promise(resolve => setTimeout(resolve, delayMs));
+		}
+	}
+	
+	console.log(`✅ Completed ETA calculation for ${results.length} stations`);
+	return results;
+}
+
+// Search buses by day, starting place, and destination
 app.get('/api/passenger/search-buses', wrap(async (req, res) => {
 	try {
 		const { day, startingPlace, destination } = req.query;
@@ -88,7 +154,7 @@ app.get('/api/passenger/search-buses', wrap(async (req, res) => {
 		
 		console.log(`Found ${buses.length} buses running on ${day}`);
 		
-		// Filter buses that match the route criteria
+		// Filter buses that match the route criteria (DIRECT ROUTES)
 		const matchingBuses = [];
 		
 		for (const bus of buses) {
@@ -166,13 +232,211 @@ app.get('/api/passenger/search-buses', wrap(async (req, res) => {
 			}
 		}
 		
-		console.log(`Found ${matchingBuses.length} matching buses`);
+		console.log(`Found ${matchingBuses.length} direct matching buses`);
 		
-		res.status(200).json({
+		// If direct buses found, return them
+		if (matchingBuses.length > 0) {
+			console.log('✅ Direct buses found, returning direct routes');
+			return res.status(200).json({
+				success: true,
+				message: `Found ${matchingBuses.length} direct buses for the specified route`,
+				buses: matchingBuses,
+				routeType: 'direct'
+			});
+		}
+		
+		// No direct buses found, implement multi-hop logic
+		console.log('🔄 No direct buses found, searching for multi-hop routes...');
+		
+		// Step 1: Find all routes that contain the starting place
+		const startingRoutes = [];
+		for (const bus of buses) {
+			for (const schedule of bus.schedules) {
+				if (schedule.days && schedule.days.includes(day)) {
+					let containsStarting = false;
+					
+					// Check if starting place is in this route
+					if (schedule.startingPlace.toLowerCase().includes(startingPlace.toLowerCase())) {
+						containsStarting = true;
+					} else if (schedule.stops && schedule.stops.length > 0) {
+						const startingPlaceIndex = schedule.stops.findIndex(stop => 
+							stop.name.toLowerCase().includes(startingPlace.toLowerCase())
+						);
+						if (startingPlaceIndex !== -1) {
+							containsStarting = true;
+						}
+					}
+					
+					if (containsStarting) {
+						startingRoutes.push({
+							bus: bus,
+							schedule: schedule
+						});
+					}
+				}
+			}
+		}
+		
+		console.log(`Found ${startingRoutes.length} routes containing starting place: ${startingPlace}`);
+		
+		// Step 2: Find all routes that contain the destination place
+		const destinationRoutes = [];
+		for (const bus of buses) {
+			for (const schedule of bus.schedules) {
+				if (schedule.days && schedule.days.includes(day)) {
+					let containsDestination = false;
+					
+					// Check if destination is in this route
+					if (schedule.destination.toLowerCase().includes(destination.toLowerCase())) {
+						containsDestination = true;
+					} else if (schedule.stops && schedule.stops.length > 0) {
+						const destinationIndex = schedule.stops.findIndex(stop => 
+							stop.name.toLowerCase().includes(destination.toLowerCase())
+						);
+						if (destinationIndex !== -1) {
+							containsDestination = true;
+						}
+					}
+					
+					if (containsDestination) {
+						destinationRoutes.push({
+							bus: bus,
+							schedule: schedule
+						});
+					}
+				}
+			}
+		}
+		
+		console.log(`Found ${destinationRoutes.length} routes containing destination: ${destination}`);
+		
+		// Step 3 & 4: Calculate ETA for middle stations and find optimal connection
+		const connectionPoints = [];
+		
+		for (const startRoute of startingRoutes) {
+			const schedule = startRoute.schedule;
+			
+			// Get all possible middle stations from this route
+			const middleStations = [];
+			
+			// Add destination of this route as a potential middle station
+			middleStations.push({
+				name: schedule.destination,
+				lat: schedule.destinationLocation?.lat || 0,
+				long: schedule.destinationLocation?.long || 0
+			});
+			
+			// Add all stops as potential middle stations
+			if (schedule.stops && schedule.stops.length > 0) {
+				schedule.stops.forEach(stop => {
+					middleStations.push(stop);
+				});
+			}
+			
+			console.log(`🚌 Processing ${middleStations.length} middle stations for route ${startRoute.bus.Bus_number_plate}`);
+			
+			// Use batch processing to calculate ETA from each middle station to final destination
+			const etaResults = await calculateETABatch(middleStations, destination, 3, 150);
+			
+			// Process results and find connection points
+			for (const result of etaResults) {
+				if (!result.success || result.eta === Infinity) {
+					continue; // Skip failed calculations
+				}
+				
+				const middleStation = result.middleStation;
+				const eta = result.eta;
+				
+				// Check if this middle station is present in any destination route
+				let isPresentInDestinationRoute = false;
+				let matchingDestinationRoute = null;
+				
+				for (const destRoute of destinationRoutes) {
+					const destSchedule = destRoute.schedule;
+					
+					// Check if middle station matches starting place of destination route
+					if (destSchedule.startingPlace.toLowerCase().includes(middleStation.name.toLowerCase())) {
+						isPresentInDestinationRoute = true;
+						matchingDestinationRoute = destRoute;
+						break;
+					}
+					
+					// Check if middle station is a stop in destination route
+					if (destSchedule.stops && destSchedule.stops.length > 0) {
+						const middleStationIndex = destSchedule.stops.findIndex(stop => 
+							stop.name.toLowerCase().includes(middleStation.name.toLowerCase())
+						);
+						if (middleStationIndex !== -1) {
+							isPresentInDestinationRoute = true;
+							matchingDestinationRoute = destRoute;
+							break;
+						}
+					}
+				}
+				
+				if (isPresentInDestinationRoute && eta !== Infinity) {
+					connectionPoints.push({
+						middleStation: middleStation.name,
+						eta: eta,
+						firstLegRoute: startRoute,
+						secondLegRoute: matchingDestinationRoute
+					});
+				}
+			}
+		}
+		
+		console.log(`Found ${connectionPoints.length} potential connection points`);
+		
+		if (connectionPoints.length === 0) {
+			return res.status(200).json({
+				success: true,
+				message: 'No routes found for the specified journey',
+				buses: [],
+				routeType: 'none'
+			});
+		}
+		
+		// Step 5: Find the connection point with minimum ETA
+		const optimalConnection = connectionPoints.reduce((min, current) => 
+			current.eta < min.eta ? current : min
+		);
+		
+		console.log(`Optimal connection point: ${optimalConnection.middleStation} with ETA: ${optimalConnection.eta} seconds`);
+		
+		// Step 6: Prepare the response with first leg and second leg buses
+		const firstLegBus = {
+			...optimalConnection.firstLegRoute.bus.toObject(),
+			schedule: optimalConnection.firstLegRoute.schedule,
+			isactive: !!(await Tracking.findOne({ 
+				busNumberPlate: optimalConnection.firstLegRoute.bus.Bus_number_plate,
+				isactive: true 
+			}))
+		};
+		
+		const secondLegBus = {
+			...optimalConnection.secondLegRoute.bus.toObject(),
+			schedule: optimalConnection.secondLegRoute.schedule,
+			isactive: !!(await Tracking.findOne({ 
+				busNumberPlate: optimalConnection.secondLegRoute.bus.Bus_number_plate,
+				isactive: true 
+			}))
+		};
+		
+		const multiHopResult = {
 			success: true,
-			message: `Found ${matchingBuses.length} buses for the specified route`,
-			buses: matchingBuses
-		});
+			message: `Found multi-hop route via ${optimalConnection.middleStation}`,
+			buses: [], // Empty for multi-hop
+			routeType: 'multi-hop',
+			multiHopRoute: {
+				middleStation: optimalConnection.middleStation,
+				totalETA: optimalConnection.eta,
+				firstLeg: [firstLegBus],
+				secondLeg: [secondLegBus]
+			}
+		};
+		
+		console.log('✅ Multi-hop route found');
+		res.status(200).json(multiHopResult);
 		
 	} catch (error) {
 		console.error('Error searching buses:', error);
@@ -340,6 +604,7 @@ app.post('/api/passenger/complaint', wrap(async (req, res) => {
 		});
 	}
 }));
+
 
 // Get all bus number plates
 app.get('/api/passenger/bus-number-plates', wrap(async (req, res) => {
