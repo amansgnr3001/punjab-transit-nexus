@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, MapPin, Navigation, Loader2, Search } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Navigation, Loader2, Search, Bus, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { usePlaces } from "@/hooks/usePlaces";
 import { useBusSearch } from "@/hooks/useBusSearch";
@@ -43,6 +43,17 @@ const CustomerPortal = () => {
     } catch (error) {
       console.error('Search failed:', error);
     }
+  };
+
+  // All Buses function - navigate to bus list page
+  const handleAllBuses = () => {
+    navigate('/customer-bus-list');
+    console.log('All Buses button clicked - navigating to bus list');
+  };
+
+  const handleComplain = () => {
+    alert('Complaint feature coming soon!');
+    console.log('Complain button clicked');
   };
 
   return (
@@ -109,7 +120,35 @@ const CustomerPortal = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-12">
-        <div className="max-w-2xl mx-auto">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Side Panel */}
+          <div className="w-full lg:w-64 flex-shrink-0">
+            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg font-semibold text-gray-800">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button 
+                  onClick={handleAllBuses}
+                  className="w-full justify-start bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-md"
+                >
+                  <Bus className="w-5 h-5 mr-3" />
+                  All Buses
+                </Button>
+                <Button 
+                  onClick={handleComplain}
+                  variant="outline"
+                  className="w-full justify-start border-gray-300 hover:bg-gray-50 text-gray-700"
+                >
+                  <MessageSquare className="w-5 h-5 mr-3" />
+                  Complain
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="flex-1 max-w-2xl">
           <div className="text-center mb-8">
             <h2 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent mb-2">
               Plan Your Journey
@@ -251,6 +290,7 @@ const CustomerPortal = () => {
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
       </main>
     </div>

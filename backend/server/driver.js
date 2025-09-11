@@ -355,6 +355,114 @@ io.on('connection', (socket) => {
 		}
 	});
 
+	// SOS_info event for emergency situations
+	socket.on('SOS_info', async (data) => {
+		try {
+			const { busNumberPlate } = data;
+			
+			console.log('=== SOS_INFO EVENT RECEIVED ===');
+			console.log('Bus number plate:', busNumberPlate);
+			
+			// Validate required data
+			if (!busNumberPlate) {
+				console.log('❌ Missing busNumberPlate in SOS_info');
+				socket.emit('sos_response', {
+					success: false,
+					message: 'Missing required field: busNumberPlate'
+				});
+				return;
+			}
+
+			// Join emergency room
+			socket.join('emergency');
+			console.log('🚨 Driver joined emergency room');
+
+			// Retrieve document from activebuses collection
+			console.log('🔍 Retrieving bus document for emergency...');
+			const activeBusDoc = await Tracking.findOne({ busNumberPlate: busNumberPlate });
+
+			if (!activeBusDoc) {
+				console.log('❌ Bus not found in activebuses collection');
+				socket.emit('sos_response', {
+					success: false,
+					message: 'Bus not found in active buses'
+				});
+				return;
+			}
+
+			// Store original destination before updating
+			const originalDestination = activeBusDoc.destination;
+			const startingPlace = activeBusDoc.startingPlace;
+
+			console.log('📋 Original destination:', originalDestination);
+			console.log('📋 Starting place:', startingPlace);
+
+			// Update the document - set destination to "stuck"
+			activeBusDoc.destination = 'stuck';
+			await activeBusDoc.save();
+
+			console.log('✅ Bus document updated - destination set to "stuck"');
+
+			// Broadcast emergency message to emergency room
+			const emergencyMessage = {
+				type: 'EMERGENCY',
+				message: '🚨 EMERGENCY ALERT! Bus is stuck and requires immediate assistance!',
+				busNumberPlate: busNumberPlate,
+				startingPlace: startingPlace,
+				originalDestination: originalDestination,
+				currentDestination: 'stuck',
+				timestamp: new Date().toISOString(),
+				driverId: activeBusDoc.driverId,
+				driverName: activeBusDoc.driverName
+			};
+
+			// Broadcast to emergency room
+			io.to('emergency').emit('emergency_alert', emergencyMessage);
+			console.log('🚨 Emergency alert broadcasted to emergency room');
+
+			// Send response back to the driver
+			socket.emit('sos_response', {
+				success: true,
+				message: 'Emergency alert sent successfully',
+				emergencyMessage: emergencyMessage
+			});
+
+		} catch (error) {
+			console.error('❌ Error in SOS_info event:', error);
+			socket.emit('sos_response', {
+				success: false,
+				message: 'Error processing emergency alert'
+			});
+		}
+	});
+
+	// Subscribe to emergency room
+	socket.on('subscribe_emergency', (data) => {
+		try {
+			console.log('=== SUBSCRIBE_EMERGENCY EVENT RECEIVED ===');
+			console.log('Socket ID:', socket.id);
+			
+			// Join emergency room
+			socket.join('emergency');
+			console.log('🚨 Socket joined emergency room:', socket.id);
+			
+			// Send confirmation back to client
+			socket.emit('emergency_subscribed', {
+				success: true,
+				message: 'Successfully subscribed to emergency notifications',
+				room: 'emergency',
+				timestamp: new Date().toISOString()
+			});
+			
+		} catch (error) {
+			console.error('❌ Error in subscribe_emergency event:', error);
+			socket.emit('emergency_subscribed', {
+				success: false,
+				message: 'Failed to subscribe to emergency notifications'
+			});
+		}
+	});
+
 	// Handle disconnection
 	socket.on('disconnect', () => {
 		console.log(`Driver disconnected: ${socket.id}`);

@@ -10,6 +10,8 @@ import BusSearchResults from "./pages/BusSearchResults";
 import BusTrackingPage from "./pages/BusTrackingPage";
 import DriverPortal from "./pages/DriverPortal";
 import MunicipalityPortal from "./pages/MunicipalityPortal";
+import BusListPage from "./pages/BusListPage";
+import CustomerBusListPage from "./pages/CustomerBusListPage";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +29,9 @@ const App = () => (
           <Route path="/track-bus/:busNumberPlate" element={<BusTrackingPage />} />
           <Route path="/driver" element={<DriverPortal />} />
           <Route path="/municipality" element={<MunicipalityPortal />} />
+          <Route path="/municipality-portal" element={<MunicipalityPortal />} />
+          <Route path="/bus-list" element={<BusListPage />} />
+          <Route path="/customer-bus-list" element={<CustomerBusListPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -257,6 +257,132 @@ app.get('/api/municipality/bus-location-count', wrap(async (req, res) => {
 	}
 }));
 
+// Get all schedules of all buses
+app.get('/api/municipality/all-schedules', wrap(async (req, res) => {
+	try {
+		console.log('📅 Fetching all schedules from all buses...');
+		
+		// Get all buses with their schedules
+		const buses = await Bus.find({}, {
+			Bus_number_plate: 1,
+			busName: 1,
+			schedules: 1
+		});
+		
+		// Get all active buses to check which ones are currently active
+		const activeBuses = await Tracking.find({}, 'busNumberPlate');
+		const activeBusNumbers = new Set(activeBuses.map(bus => bus.busNumberPlate));
+		
+		console.log(`🚌 Found ${activeBusNumbers.size} active buses:`, Array.from(activeBusNumbers));
+		
+		// Extract all schedules with bus information and isactive status
+		const allSchedules = [];
+		
+		buses.forEach(bus => {
+			bus.schedules.forEach(schedule => {
+				// Check if this bus is currently active
+				const isActive = activeBusNumbers.has(bus.Bus_number_plate);
+				
+				allSchedules.push({
+					_id: schedule._id,
+					busNumberPlate: bus.Bus_number_plate,
+					busName: bus.busName,
+					starttime: schedule.starttime,
+					endtime: schedule.endtime,
+					startingPlace: schedule.startingPlace,
+					destination: schedule.destination,
+					stops: schedule.stops,
+					days: schedule.days,
+					startLocation: schedule.startLocation,
+					destinationLocation: schedule.destinationLocation,
+					isactive: isActive
+				});
+			});
+		});
+		
+		console.log(`📅 Found ${allSchedules.length} schedules across ${buses.length} buses`);
+		console.log(`✅ Active schedules: ${allSchedules.filter(s => s.isactive).length}`);
+		console.log(`❌ Inactive schedules: ${allSchedules.filter(s => !s.isactive).length}`);
+		
+		res.json({
+			success: true,
+			totalSchedules: allSchedules.length,
+			totalBuses: buses.length,
+			activeSchedules: allSchedules.filter(s => s.isactive).length,
+			inactiveSchedules: allSchedules.filter(s => !s.isactive).length,
+			schedules: allSchedules
+		});
+		
+	} catch (error) {
+		console.error('❌ Error fetching all schedules:', error);
+		res.status(500).json({ 
+			success: false,
+			error: 'Failed to fetch all schedules',
+			message: error.message
+		});
+	}
+}));
+
+// Municipality login route
+app.post('/api/municipality/login', wrap(async (req, res) => {
+	try {
+		console.log('🔐 Municipality login attempt:', req.body);
+		
+		const { name, password } = req.body;
+		
+		// Validate required fields
+		if (!name || !password) {
+			return res.status(400).json({
+				success: false,
+				error: 'Name and password are required'
+			});
+		}
+		
+		// Find municipality by name
+		const municipality = await User.findOne({ name: name });
+		
+		if (!municipality) {
+			console.log('❌ Municipality not found:', name);
+			return res.status(401).json({
+				success: false,
+				error: 'Invalid credentials'
+			});
+		}
+		
+		// Check password (assuming it's hashed)
+		const isPasswordValid = await bcrypt.compare(password, municipality.password);
+		
+		if (!isPasswordValid) {
+			console.log('❌ Invalid password for municipality:', name);
+			return res.status(401).json({
+				success: false,
+				error: 'Invalid credentials'
+			});
+		}
+		
+		console.log('✅ Municipality login successful:', name);
+		
+		// Return success response (without sensitive data)
+		res.json({
+			success: true,
+			message: 'Login successful',
+			municipality: {
+				id: municipality._id,
+				name: municipality.name,
+				// Don't return password or other sensitive data
+			}
+		});
+		
+	} catch (error) {
+		console.error('❌ Error during municipality login:', error);
+		res.status(500).json({
+			success: false,
+			error: 'Internal server error during login',
+			message: error.message
+		});
+	}
+}));
+
 // Start server
 app.listen(PORT, () => {
 	console.log(`Municipality server running on port ${PORT}`);

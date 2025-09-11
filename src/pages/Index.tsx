@@ -63,7 +63,7 @@ const Index = () => {
 
             {/* Center - Main Title */}
             <div className="text-center">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">Punjab Transport</h1>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">Nagar-Connect</h1>
             </div>
 
             {/* Right Side - Tracking/Road Image */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Clock, Route, Wifi } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Route, Wifi, Gauge } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,28 @@ import { useBusTracking } from '@/hooks/useBusTracking';
 const BusTrackingPage: React.FC = () => {
   const { busNumberPlate } = useParams<{ busNumberPlate: string }>();
   const navigate = useNavigate();
+  
+  // Helper function to filter middle stations only
+  const getMiddleStations = () => {
+    if (!busDetails) return [];
+    
+    return markers.filter(marker => {
+      if (typeof marker.label !== 'object') return false;
+      const markerText = marker.label.text;
+      const stationName = markerText.split('\n')[0].trim(); // Get just the station name
+      
+      console.log('🔍 Checking marker:', stationName);
+      console.log('🔍 Starting place:', busDetails.startingPlace);
+      console.log('🔍 Destination:', busDetails.destination);
+      console.log('🔍 Marker type:', marker.type);
+      
+      // Filter out bus icon and check if it's a middle station
+      return markerText !== '🚌' && 
+             marker.type === 'combined' &&
+             stationName !== busDetails.startingPlace && 
+             stationName !== busDetails.destination;
+    });
+  };
   const [busDetails, setBusDetails] = useState<{
     busName: string;
     busNumberPlate: string;
@@ -47,7 +69,8 @@ const BusTrackingPage: React.FC = () => {
     currentLocation,
     busStatus,
     startTracking,
-    stopTracking
+    stopTracking,
+    currentSpeed
   } = useBusTracking();
 
   useEffect(() => {
@@ -225,7 +248,7 @@ const BusTrackingPage: React.FC = () => {
         </div>
 
         {/* Information Cards - Bottom section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Current Location */}
           <Card className="bg-gray-50 border-gray-200 shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
@@ -255,6 +278,32 @@ const BusTrackingPage: React.FC = () => {
             </CardContent>
           </Card>
 
+          {/* Current Speed */}
+          <Card className="bg-gray-50 border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center space-x-2 text-gray-800 text-sm">
+                <Gauge className="h-4 w-4 text-purple-600" />
+                <span>Current Speed</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {currentSpeed !== null ? (
+                <div className="space-y-2">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {Math.round(currentSpeed)} km/h
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Updated every 30 seconds
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">
+                  Calculating speed...
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Route Information */}
           <Card className="bg-gray-50 border-gray-200 shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
@@ -271,16 +320,14 @@ const BusTrackingPage: React.FC = () => {
                     <span className="font-medium text-blue-600">{busDetails.startingPlace}</span>
                     
                     {/* Middle Stations */}
-                    {markers
-                      .filter(marker => typeof marker.label === 'object' && marker.label.text !== '🚌')
-                      .map((marker, index) => (
-                        <React.Fragment key={index}>
-                          <span className="text-gray-400">→</span>
-                          <span className="font-medium text-green-600">
-                            {typeof marker.label === 'object' ? marker.label.text.split(' (')[0] : marker.label}
-                          </span>
-                        </React.Fragment>
-                      ))}
+                    {getMiddleStations().map((marker, index) => (
+                      <React.Fragment key={index}>
+                        <span className="text-gray-400">→</span>
+                        <span className="font-medium text-green-600">
+                          {typeof marker.label === 'object' ? marker.label.text.split('\n')[0] : marker.label}
+                        </span>
+                      </React.Fragment>
+                    ))}
                     
                     {/* Destination */}
                     <span className="text-gray-400">→</span>
@@ -288,7 +335,7 @@ const BusTrackingPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="text-xs text-gray-500">
-                  {markers.length > 2 ? `${markers.length - 2} stops` : 'Direct route'}
+                  {getMiddleStations().length > 0 ? `${getMiddleStations().length} stops` : 'Direct route'}
                 </div>
               </div>
             </CardContent>
@@ -342,31 +389,77 @@ const BusTrackingPage: React.FC = () => {
         </div>
 
         {/* Route Stops Section */}
-        {markers.length > 2 && (
-          <Card className="mt-6 bg-gray-50 border-gray-200 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-gray-800">Route Stops</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-2">
-                {markers
-                  .filter(marker => typeof marker.label === 'object' && marker.label.text !== '🚌')
-                  .map((marker, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <Card className="mt-6 bg-gray-50 border-gray-200 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-gray-800">Route Stops</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              {/* Starting Place */}
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex items-center space-x-3">
+                  <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                    1
+                  </div>
+                  <span className="text-sm font-medium text-blue-600">
+                    {busDetails.startingPlace}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Middle Stations */}
+              {(() => {
+                const middleStations = getMiddleStations();
+                console.log('🔍 All markers:', markers);
+                console.log('🔍 Middle stations found:', middleStations);
+                console.log('🔍 Bus details:', busDetails);
+                
+                // If no middle stations found, show all markers for debugging
+                if (middleStations.length === 0 && markers.length > 0) {
+                  console.log('⚠️ No middle stations found, showing all markers for debugging');
+                  return markers.filter(marker => typeof marker.label === 'object' && marker.label.text !== '🚌').map((marker, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200 shadow-sm">
                       <div className="flex items-center space-x-3">
-                        <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                        <div className="w-6 h-6 bg-yellow-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
                           {index + 1}
                         </div>
-                        <span className="text-sm font-medium">
-                          {typeof marker.label === 'object' ? marker.label.text : marker.label}
+                        <span className="text-sm font-medium text-yellow-700">
+                          {typeof marker.label === 'object' ? marker.label.text.split('\n')[0] : marker.label}
                         </span>
+                        <span className="text-xs text-yellow-600">(Debug)</span>
                       </div>
                     </div>
-                  ))}
+                  ));
+                }
+                
+                return middleStations.map((marker, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                        {index + 2}
+                      </div>
+                      <span className="text-sm font-medium text-green-600">
+                        {typeof marker.label === 'object' ? marker.label.text.split('\n')[0] : marker.label}
+                      </span>
+                    </div>
+                  </div>
+                ));
+              })()}
+              
+              {/* Destination */}
+              <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex items-center space-x-3">
+                  <div className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                    {getMiddleStations().length + 2}
+                  </div>
+                  <span className="text-sm font-medium text-red-600">
+                    {busDetails.destination}
+                  </span>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -81,6 +81,7 @@ interface UseBusTrackingReturn {
   stopTracking: () => void;
   error: string | null;
   busStatus: 'active' | 'reached' | 'unknown';
+  currentSpeed: number | null;
 }
 
 export const useBusTracking = (): UseBusTrackingReturn => {
@@ -112,6 +113,7 @@ export const useBusTracking = (): UseBusTrackingReturn => {
   }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [busStatus, setBusStatus] = useState<'active' | 'reached' | 'unknown'>('unknown');
+  const [currentSpeed, setCurrentSpeed] = useState<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   const formatTime = (timeInSeconds: number): string => {
@@ -120,15 +122,37 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
+  // Calculate distance between two points using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in kilometers
+  };
+
+  // Calculate speed in km/h
+  const calculateSpeed = (currentLat: number, currentLon: number, lastLat: number, lastLon: number): number => {
+    const distance = calculateDistance(lastLat, lastLon, currentLat, currentLon);
+    const timeInHours = 30 / 3600; // 30 seconds in hours
+    return distance / timeInHours; // Speed in km/h
+  };
+
   // Helper functions for localStorage persistence
-  const saveMarkerDataToStorage = (activeBusDoc: ActiveBusDoc, polylineData: string, markersData: any[], currentLoc: any) => {
+  const saveMarkerDataToStorage = (activeBusDoc: ActiveBusDoc, polylineData: string, markersData: any[], currentLoc: any, lastLocation?: any, speed?: number | null) => {
     try {
       const markerData = {
         activeBus: activeBusDoc,
         polyline: polylineData,
         timestamp: Date.now(),
         markers: markersData,
-        currentLocation: currentLoc
+        currentLocation: currentLoc,
+        lastLocation: lastLocation || null,
+        currentSpeed: speed || null
       };
       localStorage.setItem('busTrackingData', JSON.stringify(markerData));
       console.log('💾 Saved marker data to localStorage');
@@ -157,6 +181,7 @@ export const useBusTracking = (): UseBusTrackingReturn => {
           setPolyline(markerData.polyline);
           setMarkers(markerData.markers || []);
           setCurrentLocation(markerData.currentLocation);
+          setCurrentSpeed(markerData.currentSpeed || null);
           console.log('✅ Restored marker data from localStorage');
           return true;
         } else {
@@ -580,12 +605,37 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     console.log('🎯 Total markers created:', newMarkers.length);
     setMarkers(newMarkers);
     
-    // Save marker data to localStorage for persistence
+    // Calculate speed if we have previous location
+    let speed = null;
     const currentLoc = {
       lat: activeBusDoc.currLat,
       lng: activeBusDoc.currLong
     };
-    saveMarkerDataToStorage(activeBusDoc, polyline || '', newMarkers, currentLoc);
+
+    // Try to get last location from localStorage
+    try {
+      const storedData = localStorage.getItem('busTrackingData');
+      if (storedData) {
+        const markerData = JSON.parse(storedData);
+        if (markerData.currentLocation && markerData.currentLocation.lat && markerData.currentLocation.lng) {
+          const lastLoc = markerData.currentLocation;
+          speed = calculateSpeed(
+            activeBusDoc.currLat, 
+            activeBusDoc.currLong, 
+            lastLoc.lat, 
+            lastLoc.lng
+          );
+          console.log('🚀 Calculated speed:', speed, 'km/h');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error calculating speed:', error);
+    }
+
+    setCurrentSpeed(speed);
+    
+    // Save marker data to localStorage for persistence
+    saveMarkerDataToStorage(activeBusDoc, polyline || '', newMarkers, currentLoc, currentLoc, speed);
   }, []);
 
   const startTracking = React.useCallback((busNumberPlate: string, schedule?: any) => {
@@ -737,6 +787,7 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     startTracking,
     stopTracking,
     error,
-    busStatus
+    busStatus,
+    currentSpeed
   };
 };

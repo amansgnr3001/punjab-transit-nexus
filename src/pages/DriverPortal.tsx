@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, User, PlayCircle, LogIn, UserPlus } from "lucide-react";
+import { ArrowLeft, User, PlayCircle, LogIn, UserPlus, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBusRoutes } from "@/hooks/useBusRoutes";
 import { io } from "socket.io-client";
@@ -36,6 +36,7 @@ const DriverPortal = () => {
   const [locationIntervalId, setLocationIntervalId] = useState(null);
   const [socket, setSocket] = useState(null);
   const [journeyStatus, setJourneyStatus] = useState('0'); // 0 = no journey, 1 = journey active
+  const [currentBusDetails, setCurrentBusDetails] = useState(null); // Store current bus details for SOS
 
   // Custom hook for bus routes
   const { startingPlaces, destinations, loading: routesLoading, error: routesError, fetchRoutes, clearRoutes } = useBusRoutes();
@@ -58,6 +59,18 @@ const DriverPortal = () => {
         const savedBusNumberPlate = localStorage.getItem('driverBusNumberPlate');
         if (savedBusNumberPlate) {
           console.log('🔄 Restoring active journey after page refresh');
+          
+          // Restore bus details for SOS
+          const busDetailsData = localStorage.getItem('currentBusDetails');
+          if (busDetailsData) {
+            try {
+              const busDetails = JSON.parse(busDetailsData);
+              setCurrentBusDetails(busDetails);
+              console.log('🚌 Restored bus details for SOS:', busDetails);
+            } catch (error) {
+              console.error('Error parsing bus details data:', error);
+            }
+          }
           
           // Set journey as active
           setIsJourneyActive(true);
@@ -304,6 +317,17 @@ const DriverPortal = () => {
         // Save bus number plate to localStorage
         localStorage.setItem('driverBusNumberPlate', journeyForm.busNo);
         
+        // Store current bus details for SOS
+        const busDetails = {
+          busNumberPlate: journeyForm.busNo,
+          startingPlace: journeyForm.startingPlace,
+          destination: journeyForm.destination,
+          driverName: journeyForm.driverName,
+          driverId: journeyForm.driverId
+        };
+        setCurrentBusDetails(busDetails);
+        localStorage.setItem('currentBusDetails', JSON.stringify(busDetails));
+        
         // Set journey as active
         setIsJourneyActive(true);
         setActiveJourney(data.activeBus);
@@ -312,7 +336,7 @@ const DriverPortal = () => {
         localStorage.setItem('driverJourneyStatus', '1');
         setJourneyStatus('1');
         
-        // Initialize socket connection
+        // Initialize socket connection for location tracking and SOS
         const newSocket = io('http://localhost:3001');
         setSocket(newSocket);
         
@@ -384,13 +408,55 @@ const DriverPortal = () => {
     localStorage.removeItem('driverName');
     localStorage.removeItem('driverContactNumber');
     localStorage.removeItem('driverBusNumberPlate');
+    localStorage.removeItem('currentBusDetails');
+    
+    // Clear location tracking interval
+    if (locationIntervalId) {
+      clearInterval(locationIntervalId);
+      setLocationIntervalId(null);
+    }
+    
+    // Disconnect socket
+    if (socket) {
+      socket.disconnect();
+      setSocket(null);
+    }
+    
     setIsLoggedIn(false);
     setDriverData(null);
+    setCurrentBusDetails(null);
     setLoginForm({ contactNumber: "", password: "" });
     setRegisterForm({ name: "", age: "", contactNumber: "", password: "" });
     setShowRegister(false);
     setError("");
     setShowStartJourneyForm(false);
+  };
+
+  const handleSOS = () => {
+    // Check if we have socket connection and bus details
+    if (!socket) {
+      alert('Error: No connection to emergency services. Please restart your journey.');
+      console.error('❌ No socket connection for SOS');
+      return;
+    }
+
+    if (!currentBusDetails || !currentBusDetails.busNumberPlate) {
+      alert('Error: No bus details available for emergency alert.');
+      console.error('❌ No bus details for SOS');
+      return;
+    }
+
+    // Send SOS_info event to backend
+    const sosData = {
+      busNumberPlate: currentBusDetails.busNumberPlate
+    };
+
+    console.log('🚨 Sending SOS alert:', sosData);
+    socket.emit('SOS_info', sosData);
+    
+    // Show confirmation to driver
+    alert('SOS Alert! Emergency assistance has been notified. Your location and bus details have been shared with emergency services.');
+    console.log('🚨 SOS alert sent to emergency services');
   };
 
   return (
@@ -426,9 +492,19 @@ const DriverPortal = () => {
             </div>
             
             {isLoggedIn ? (
-              <Button variant="outline" onClick={handleLogout}>
-                Logout
-              </Button>
+              <div className="flex items-center space-x-3">
+                <Button 
+                  variant="outline" 
+                  onClick={handleSOS}
+                  className="bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+                >
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  SOS
+                </Button>
+                <Button variant="outline" onClick={handleLogout}>
+                  Logout
+                </Button>
+              </div>
             ) : (
               <div className="w-20"></div> // Spacer to keep center aligned
             )}

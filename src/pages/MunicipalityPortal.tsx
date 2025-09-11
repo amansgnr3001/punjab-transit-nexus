@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, User, LogIn, Bus, Route, Calendar, Plus, X, BarChart3, Loader2 } from "lucide-react";
+import { ArrowLeft, User, LogIn, Bus, Route, Calendar, Plus, X, BarChart3, Loader2, AlertTriangle, X as CloseIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { io, Socket } from 'socket.io-client';
 
 const MunicipalityPortal = () => {
   const navigate = useNavigate();
@@ -16,6 +17,21 @@ const MunicipalityPortal = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [analyticsData, setAnalyticsData] = useState<{[key: string]: number}>({});
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [emergencyAlerts, setEmergencyAlerts] = useState<Array<{
+    id: string;
+    type: string;
+    message: string;
+    busNumberPlate: string;
+    startingPlace: string;
+    originalDestination: string;
+    currentDestination: string;
+    timestamp: string;
+    driverId: string;
+    driverName: string;
+  }>>([]);
+  const [showEmergencyAlert, setShowEmergencyAlert] = useState(false);
+  const [currentEmergency, setCurrentEmergency] = useState<any>(null);
   const [busForm, setBusForm] = useState({
     Bus_number_plate: "",
     busName: "",
@@ -37,18 +53,169 @@ const MunicipalityPortal = () => {
     }]
   });
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loginForm.username && loginForm.password) {
-      setIsLoggedIn(true);
+      try {
+        // Call login API
+        const response = await fetch('http://localhost:3000/api/municipality/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: loginForm.username,
+            password: loginForm.password
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          setIsLoggedIn(true);
+          console.log('✅ Municipality login successful');
+          
+          // Initialize Socket.IO connection
+          initializeSocket();
+          
+          // Retrieve stored emergency messages
+          const storedMessages = retrieveEmergencyMessages();
+          if (storedMessages.length > 0) {
+            console.log('📥 Found stored emergency messages:', storedMessages.length);
+            setEmergencyAlerts(storedMessages);
+            
+            // Show the most recent emergency if any
+            if (storedMessages.length > 0) {
+              setCurrentEmergency(storedMessages[0]);
+              setShowEmergencyAlert(true);
+              
+              // Auto-hide after 10 seconds
+              setTimeout(() => {
+                setShowEmergencyAlert(false);
+              }, 10000);
+            }
+          }
+        } else {
+          alert('Login failed: ' + data.error);
+        }
+      } catch (error) {
+        console.error('❌ Login error:', error);
+        alert('Login failed. Please try again.');
+      }
+    }
+  };
+
+  // localStorage functions for emergency messages
+  const saveEmergencyMessage = (message: any) => {
+    try {
+      const storedMessages = JSON.parse(localStorage.getItem('municipality_emergency_messages') || '[]');
+      const newMessage = {
+        id: Date.now().toString(),
+        ...message,
+        storedAt: new Date().toISOString()
+      };
+      
+      const updatedMessages = [newMessage, ...storedMessages];
+      localStorage.setItem('municipality_emergency_messages', JSON.stringify(updatedMessages));
+      console.log('💾 Emergency message saved to localStorage');
+    } catch (error) {
+      console.error('❌ Error saving emergency message to localStorage:', error);
+    }
+  };
+
+  const retrieveEmergencyMessages = () => {
+    try {
+      const storedMessages = JSON.parse(localStorage.getItem('municipality_emergency_messages') || '[]');
+      console.log('📥 Retrieved emergency messages from localStorage:', storedMessages.length);
+      return storedMessages;
+    } catch (error) {
+      console.error('❌ Error retrieving emergency messages from localStorage:', error);
+      return [];
+    }
+  };
+
+  const clearEmergencyMessages = () => {
+    try {
+      localStorage.removeItem('municipality_emergency_messages');
+      console.log('🗑️ Emergency messages cleared from localStorage');
+    } catch (error) {
+      console.error('❌ Error clearing emergency messages from localStorage:', error);
+    }
+  };
+
+  const initializeSocket = () => {
+    try {
+      console.log('🔌 Initializing Socket.IO connection...');
+      const newSocket = io('http://localhost:3001');
+      
+      newSocket.on('connect', () => {
+        console.log('✅ Connected to Socket.IO server');
+        
+        // Subscribe to emergency room
+        newSocket.emit('subscribe_emergency', {});
+        console.log('🚨 Subscribed to emergency room');
+      });
+
+      newSocket.on('emergency_subscribed', (data) => {
+        console.log('✅ Emergency subscription confirmed:', data);
+      });
+
+      newSocket.on('emergency_alert', (data) => {
+        console.log('🚨 Emergency alert received:', data);
+        
+        // Always save to localStorage (whether logged in or out)
+        saveEmergencyMessage(data);
+        
+        // Add to emergency alerts list
+        const alertId = Date.now().toString();
+        const newAlert = {
+          id: alertId,
+          ...data
+        };
+        
+        setEmergencyAlerts(prev => [newAlert, ...prev]);
+        
+        // Only show alert if logged in
+        if (isLoggedIn) {
+          setCurrentEmergency(newAlert);
+          setShowEmergencyAlert(true);
+          
+          // Auto-hide alert after 10 seconds
+          setTimeout(() => {
+            setShowEmergencyAlert(false);
+          }, 10000);
+        } else {
+          console.log('📱 Municipality is logged out - message stored for later');
+        }
+      });
+
+      newSocket.on('disconnect', () => {
+        console.log('❌ Socket disconnected');
+      });
+
+      newSocket.on('error', (error) => {
+        console.error('❌ Socket error:', error);
+      });
+
+      setSocket(newSocket);
+    } catch (error) {
+      console.error('❌ Socket initialization error:', error);
     }
   };
 
   const handleLogout = () => {
+    // Don't disconnect socket - keep it connected for emergency room
+    // Just hide UI and mark as logged out
+    console.log('🚪 Municipality logged out - keeping socket connected for emergency room');
+    
     setIsLoggedIn(false);
     setLoginForm({ username: "", password: "" });
     setActiveSection("dashboard");
+    // Don't clear emergency alerts - keep them for when they log back in
+    setShowEmergencyAlert(false);
+    setCurrentEmergency(null);
   };
+
 
   const fetchAnalyticsData = async () => {
     setIsLoadingAnalytics(true);
@@ -73,6 +240,16 @@ const MunicipalityPortal = () => {
       fetchAnalyticsData();
     }
   }, [activeSection, isLoggedIn]);
+
+  // Cleanup socket only on component unmount (page close/refresh)
+  useEffect(() => {
+    return () => {
+      if (socket) {
+        socket.disconnect();
+        console.log('🔌 Socket disconnected on component unmount (page close)');
+      }
+    };
+  }, [socket]);
 
   const handleAddBus = () => {
     setActiveSection("addBus");
@@ -554,6 +731,7 @@ const MunicipalityPortal = () => {
                               axisLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
                               tickLine={{ stroke: '#cbd5e1' }}
                               tickCount={6}
+                              tickFormatter={(value) => Math.round(value).toString()}
                             />
                             <Tooltip 
                               formatter={(value: number) => [
@@ -721,6 +899,124 @@ const MunicipalityPortal = () => {
         </div>
       </header>
 
+      {/* Emergency Alert Modal */}
+      {showEmergencyAlert && currentEmergency && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="bg-red-600 text-white p-4 rounded-t-lg flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-6 h-6" />
+                <h3 className="text-lg font-bold">EMERGENCY ALERT</h3>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowEmergencyAlert(false)}
+                className="text-white hover:bg-red-700"
+              >
+                <CloseIcon className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="p-6">
+              <div className="space-y-4">
+                <div className="text-center">
+                  <p className="text-red-600 font-semibold text-lg mb-2">
+                    {currentEmergency.message}
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="font-medium">Bus Number:</span>
+                    <span className="text-gray-700">{currentEmergency.busNumberPlate}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Driver:</span>
+                    <span className="text-gray-700">{currentEmergency.driverName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Route:</span>
+                    <span className="text-gray-700">
+                      {currentEmergency.startingPlace} → {currentEmergency.originalDestination}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Status:</span>
+                    <span className="text-red-600 font-semibold">STUCK</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Time:</span>
+                    <span className="text-gray-700">
+                      {new Date(currentEmergency.timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex space-x-3 pt-4">
+                  <Button
+                    onClick={() => setShowEmergencyAlert(false)}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Acknowledge
+                  </Button>
+                  <Button
+                    onClick={() => setShowEmergencyAlert(false)}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Emergency Alerts List (if any) */}
+      {emergencyAlerts.length > 0 && (
+        <div className="fixed top-20 right-4 z-40 max-w-sm">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 shadow-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-semibold text-red-800">Recent Emergencies ({emergencyAlerts.length})</h4>
+              <div className="flex space-x-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEmergencyAlerts([]);
+                    clearEmergencyMessages();
+                  }}
+                  className="text-red-600 hover:bg-red-100 text-xs"
+                >
+                  Clear All
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEmergencyAlerts([])}
+                  className="text-red-600 hover:bg-red-100"
+                >
+                  <CloseIcon className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {emergencyAlerts.slice(0, 3).map((alert) => (
+                <div key={alert.id} className="text-sm bg-white rounded p-2 border border-red-200">
+                  <div className="font-medium text-red-800">{alert.busNumberPlate}</div>
+                  <div className="text-gray-600">{alert.startingPlace} → {alert.originalDestination}</div>
+                  <div className="text-xs text-gray-500">
+                    {new Date(alert.timestamp).toLocaleTimeString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <main className="flex-1">
         {!isLoggedIn ? (
@@ -787,7 +1083,13 @@ const MunicipalityPortal = () => {
                         {sidebarItems.map((item) => (
                           <SidebarMenuItem key={item.id}>
                             <SidebarMenuButton 
-                              onClick={() => setActiveSection(item.id)}
+                              onClick={() => {
+                                if (item.id === "bus") {
+                                  navigate('/bus-list');
+                                } else {
+                                  setActiveSection(item.id);
+                                }
+                              }}
                               className={`w-full justify-start ${
                                 activeSection === item.id 
                                   ? 'bg-government-green/10 text-government-green font-medium' 
