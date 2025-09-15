@@ -412,8 +412,8 @@ const BusSearchResults = () => {
                     </div>
                   </div>
 
-                  {/* Track Button for Active Buses */}
-                  {bus.isactive && (
+                  {/* Track Button - Only show for active buses */}
+                  {bus.isactive ? (
                     <div className="mt-8 pt-6 border-t border-gray-200">
                       <Button 
                         className={`w-full py-4 text-lg font-semibold rounded-lg transition-all ${
@@ -467,6 +467,13 @@ const BusSearchResults = () => {
                         <Navigation className="w-5 h-5 mr-3" />
                         {busStatuses[bus.Bus_number_plate] === 'reached' ? 'Bus Reached Destination' : 'Track This Bus'}
                       </Button>
+                    </div>
+                  ) : (
+                    <div className="mt-8 pt-6 border-t border-gray-200">
+                      <div className="w-full py-4 text-lg font-semibold rounded-lg bg-gray-100 text-gray-500 text-center">
+                        <Bus className="w-5 h-5 mr-3 inline" />
+                        Bus Not Available for Tracking
+                      </div>
                     </div>
                   )}
                 </div>

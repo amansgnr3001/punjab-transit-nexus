@@ -144,6 +144,9 @@ const BusTrackingMap: React.FC<BusTrackingMapProps> = ({
 
   // Decode polyline for display
   const getPolylinePath = () => {
+    console.log('🗺️ getPolylinePath called with polyline:', polyline ? 'Present' : 'Null');
+    console.log('🗺️ Polyline length:', polyline?.length || 0);
+    
     if (!polyline) {
       console.log('🗺️ No polyline data available');
       return [];
@@ -298,17 +301,25 @@ const BusTrackingMap: React.FC<BusTrackingMapProps> = ({
         {(() => {
           const polylinePath = getPolylinePath();
           console.log('🗺️ Rendering polyline with', polylinePath.length, 'points');
-          return polylinePath.length > 0 && (
-            <Polyline
-              path={polylinePath}
-              options={{
-                strokeColor: '#000000',
-                strokeOpacity: 1.0,
-                strokeWeight: 6,
-                geodesic: true
-              }}
-            />
-          );
+          console.log('🗺️ Polyline path sample:', polylinePath.slice(0, 3));
+          
+          if (polylinePath.length > 0) {
+            console.log('✅ Rendering polyline component');
+            return (
+              <Polyline
+                path={polylinePath}
+                options={{
+                  strokeColor: '#000000',
+                  strokeOpacity: 1.0,
+                  strokeWeight: 6,
+                  geodesic: true
+                }}
+              />
+            );
+          } else {
+            console.log('❌ Not rendering polyline - no path points');
+            return null;
+          }
         })()}
 
         {/* Show tracking status */}

@@ -143,11 +143,20 @@ export const useBusTracking = (): UseBusTrackingReturn => {
   };
 
   // Helper functions for localStorage persistence
-  const saveMarkerDataToStorage = (activeBusDoc: ActiveBusDoc, polylineData: string, markersData: any[], currentLoc: any, lastLocation?: any, speed?: number | null) => {
+  const saveMarkerDataToStorage = (activeBusDoc: ActiveBusDoc, polylineData: string | null, markersData: any[], currentLoc: any, lastLocation?: any, speed?: number | null) => {
     try {
+      console.log('💾 saveMarkerDataToStorage called with polyline:', polylineData ? 'Present' : 'Empty');
+      console.log('💾 Polyline data length:', polylineData?.length || 0);
+      
+      // Fix: Ensure polyline is properly handled
+      let polylineToSave = polylineData;
+      if (polylineToSave === 'null' || polylineToSave === '' || !polylineToSave) {
+        polylineToSave = null;
+      }
+      
       const markerData = {
         activeBus: activeBusDoc,
-        polyline: polylineData,
+        polyline: polylineToSave, // Save as null instead of 'null' string
         timestamp: Date.now(),
         markers: markersData,
         currentLocation: currentLoc,
@@ -171,6 +180,10 @@ export const useBusTracking = (): UseBusTrackingReturn => {
         console.log('🔄 Restoring marker data from localStorage:', markerData);
         console.log('🔄 Markers count:', markerData.markers?.length || 0);
         console.log('🔄 Active bus:', markerData.activeBus);
+        console.log('🔄 Polyline data:', markerData.polyline ? 'Present' : 'Missing');
+        console.log('🔄 Polyline length:', markerData.polyline?.length || 0);
+        console.log('🔄 Polyline value:', markerData.polyline);
+        console.log('🔄 Polyline type:', typeof markerData.polyline);
         
         // Check if data is not too old (e.g., less than 5 minutes)
         const dataAge = Date.now() - markerData.timestamp;
@@ -178,11 +191,26 @@ export const useBusTracking = (): UseBusTrackingReturn => {
         
         if (dataAge < 5 * 60 * 1000) { // 5 minutes
           setActiveBus(markerData.activeBus);
-          setPolyline(markerData.polyline);
+          
+          // Fix: Handle both null and 'null' string cases
+          let polylineValue = markerData.polyline;
+          if (polylineValue === 'null' || polylineValue === null || polylineValue === undefined) {
+            polylineValue = null;
+          }
+          setPolyline(polylineValue);
+          
           setMarkers(markerData.markers || []);
           setCurrentLocation(markerData.currentLocation);
           setCurrentSpeed(markerData.currentSpeed || null);
+          setIsTracking(true); // Set tracking state to true when restoring
           console.log('✅ Restored marker data from localStorage');
+          console.log('✅ Polyline restored:', polylineValue ? 'Yes' : 'No');
+          if (polylineValue) {
+            console.log('✅ Polyline length restored:', polylineValue.length);
+          } else {
+            console.log('⚠️ No polyline data in localStorage - this might cause the polyline to not display');
+          }
+          console.log('✅ Tracking state set to true');
           return true;
         } else {
           console.log('⏰ Stored data is too old, clearing localStorage');
@@ -635,7 +663,14 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     setCurrentSpeed(speed);
     
     // Save marker data to localStorage for persistence
-    saveMarkerDataToStorage(activeBusDoc, polyline || '', newMarkers, currentLoc, currentLoc, speed);
+    console.log('💾 Saving to localStorage - polyline:', polyline ? 'Present' : 'Null');
+    if (polyline) {
+      console.log('💾 Polyline length being saved:', polyline.length);
+      console.log('💾 Polyline value being saved:', polyline.substring(0, 50) + '...');
+    } else {
+      console.log('💾 No polyline to save - this will cause polyline to be missing after refresh');
+    }
+    saveMarkerDataToStorage(activeBusDoc, polyline || null, newMarkers, currentLoc, currentLoc, speed);
   }, []);
 
   const startTracking = React.useCallback((busNumberPlate: string, schedule?: any) => {
@@ -645,6 +680,13 @@ export const useBusTracking = (): UseBusTrackingReturn => {
       console.log('🚀 Starting tracking for bus:', busNumberPlate);
       console.log('📅 Schedule provided:', schedule);
       console.log('📅 Schedule type:', typeof schedule);
+      console.log('🚀 Current tracking state - isTracking:', isTracking, 'activeBus:', activeBus?.busNumberPlate);
+      
+      // If already tracking the same bus, don't start a new connection
+      if (isTracking && activeBus && activeBus.busNumberPlate === busNumberPlate) {
+        console.log('🔄 Already tracking this bus, skipping new connection');
+        return;
+      }
       
       // Schedule will be used in combined markers when real-time data arrives
       if (schedule) {
@@ -709,6 +751,9 @@ export const useBusTracking = (): UseBusTrackingReturn => {
         console.log('🎯 Data success:', data.success);
         console.log('🎯 Active bus data:', data.activeBus);
         console.log('🎯 Polyline data:', data.polyline);
+        console.log('🎯 Polyline type:', typeof data.polyline);
+        console.log('🎯 Polyline length:', data.polyline?.length || 0);
+        console.log('🎯 Polyline value:', data.polyline);
         
         if (data.success && data.activeBus) {
           console.log('✅ Processing bus update...');
@@ -760,11 +805,42 @@ export const useBusTracking = (): UseBusTrackingReturn => {
     setBusStatus('unknown');
   }, []);
 
+  // Monitor polyline state changes
+  useEffect(() => {
+    console.log('🔄 Polyline state changed:', polyline ? 'Present' : 'Null');
+    if (polyline) {
+      console.log('🔄 Polyline length:', polyline.length);
+      console.log('🔄 Polyline preview:', polyline.substring(0, 50) + '...');
+    } else {
+      console.log('🔄 Polyline is null/undefined');
+    }
+  }, [polyline]);
+
   // Restore data from localStorage on component mount
   useEffect(() => {
+    console.log('🔄 Component mount - attempting to restore data from localStorage');
+    
+    // Check for corrupted polyline data and clear if needed
+    const storedData = localStorage.getItem('busTrackingData');
+    if (storedData) {
+      try {
+        const markerData = JSON.parse(storedData);
+        if (markerData.polyline === 'null') {
+          console.log('🧹 Found corrupted polyline data (string "null"), clearing localStorage');
+          localStorage.removeItem('busTrackingData');
+        }
+      } catch (error) {
+        console.log('🧹 Found corrupted localStorage data, clearing');
+        localStorage.removeItem('busTrackingData');
+      }
+    }
+    
     const restored = restoreMarkerDataFromStorage();
     if (restored) {
       console.log('🔄 Restored markers from localStorage on mount');
+      console.log('🔄 Current polyline state after restoration:', polyline);
+    } else {
+      console.log('🔄 No data restored from localStorage');
     }
   }, []);
 
